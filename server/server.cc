@@ -49,7 +49,7 @@ int main()
         return 1;
     }
 
-    nexilis::Log::startConsoleDebugging();
+    // nexilis::Log::startConsoleDebugging();
 
     using namespace nexilis::server;
 

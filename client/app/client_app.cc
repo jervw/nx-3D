@@ -488,6 +488,10 @@ void ClientApp::run()
         audio_system.update();
 
         // --- State machine ---
+        if (currentState == State::Connecting &&
+            tcp_client.getProtocolStatus() == nexilis::client::ProtocolStatus::error)
+            ui->statusText.setString("Connection failed. Check server address and TCP ports 54200/54202.");
+
         if (currentState == State::Connecting && ready && !menuPopulated)
         {
             tcp_client.sendMessage(packet::Set::General::username(client_api, username));

@@ -25,10 +25,12 @@ void BombMode::update(ClientApp& app, float dt)
         m_triggerHeld = false;
     DeathmatchMode::update(app, dt);
 
-    for (const auto& event : app.client_api.consumeMatchEvents())
+    for (const auto& matchEvent : app.client_api.consumeMatchEvents())
     {
-        if (event.room_id != app.client_api.clientRoomId())
+        if (!matchEvent || matchEvent->kind() != nexilis::client::ClientAPI::MatchEvent::Kind::bomb ||
+            matchEvent->room_id != app.client_api.clientRoomId())
             continue;
+        const auto& event = static_cast<const nexilis::client::ClientAPI::BombMatchEvent&>(*matchEvent);
         const bool newRound = event.round != m_round;
         const bool bombExploded = m_phase == "live" && event.phase == "post" &&
                                   event.notice == "T win: Bomb exploded";
