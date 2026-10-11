@@ -93,7 +93,7 @@ The first version uses one shared bomb: any living Terrorist may hold E for thre
 
 ## Manual releases
 
-Commit and push the default branch, then run `bash scripts/release.sh 0.1.1` (replace the version with the version you want). The script requires GitHub CLI authentication and starts the `manual-release.yml` workflow. Set the repository secret `RELEASE_READ_TOKEN` to a token that can read the private Nexilis and Spear repositories. Watch the run with `gh run list --workflow manual-release.yml`.
+Set the Actions repository secret `RELEASE_READ_TOKEN` in `nexilistudios/nx-3D` to a token with read access to both `Nexilislib/nexilis` and `NeuronActivation/spear`. With GitHub CLI, use `gh secret set RELEASE_READ_TOKEN -R nexilistudios/nx-3D` and paste the token when prompted. Commit and push the default branch, then run `bash scripts/release.sh 0.1.1` (replace the version with the version you want). The script requires GitHub CLI authentication and starts the `manual-release.yml` workflow. Watch the run with `gh run list --workflow manual-release.yml`.
 
 After all builds succeed, the workflow updates `VERSION.txt`, tags the release, and publishes four GitHub release assets: Linux and Windows archives for both server and client. Linux clients run `run.sh` from the extracted archive; Windows clients run `run.bat`. The release workflow has no schedule.
 
