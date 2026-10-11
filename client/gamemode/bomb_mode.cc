@@ -83,6 +83,7 @@ void BombMode::update(ClientApp& app, float dt)
             {
                 m_lastSpawnIndex = SIZE_MAX;
                 app.camera.setPosition(pickSpawnPoint());
+                app.movement_controller.resetVerticalMotion();
                 m_prevCamPos = app.camera.getPosition();
             }
             m_weaponPickedUp = true;

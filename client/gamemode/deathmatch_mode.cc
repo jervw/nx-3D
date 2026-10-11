@@ -53,7 +53,10 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
     const auto& spawns = (m_team == "Terrorist") ? m_tSpawns : m_ctSpawns;
     m_lastSpawnIndex = SIZE_MAX;
     if (!spawns.empty())
+    {
         app.camera.setPosition(pickSpawnPoint());
+        app.movement_controller.resetVerticalMotion();
+    }
 
     m_health = 100;
     app.ui->healthText.setString("HP: " + std::to_string(m_health));
@@ -198,7 +201,10 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
         {
             const auto& spawns = (m_team == "Terrorist") ? m_tSpawns : m_ctSpawns;
             if (!spawns.empty())
+            {
                 app.camera.setPosition(pickSpawnPoint());
+                app.movement_controller.resetVerticalMotion();
+            }
             m_prevCamPos = app.camera.getPosition();
             m_triggerHeld = false;
             m_burstShots = 0;

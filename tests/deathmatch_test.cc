@@ -1,4 +1,5 @@
 #include <server/gamemode/game_mode_registry.hh>
+#include <shared/fall_death.hh>
 
 #include <nexilis/client/packet.hh>
 #include <nexilis/server/client_storage.hh>
@@ -101,7 +102,10 @@ int main()
         }
 
         auto* fallingPlayer = server::ClientStorage::getClientById(20);
-        fallingPlayer->getObject3D().setPosition(Vector3f{0.0f, -600.0f, 0.0f});
+        fallingPlayer->getObject3D().setPosition(Vector3f{0.0f, nx3d::kFallDeathY + 1.0f, 0.0f});
+        Registry::update(1.0f / 60.0f);
+        require(room->getPlayerDeaths(20) == 100, "Player died above the fall plane");
+        fallingPlayer->getObject3D().setPosition(Vector3f{0.0f, nx3d::kFallDeathY - 1.0f, 0.0f});
         Registry::update(1.0f / 60.0f);
         require(room->getPlayerDeaths(20) == 101, "Falling did not count as a death");
         require(room->getPlayerKills(10) == 100, "Falling credited another player with a kill");

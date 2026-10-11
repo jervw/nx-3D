@@ -12,6 +12,7 @@
 #include <nexilis/udp_client.hh>
 #include <nexilis/util.hh>
 
+#include <shared/fall_death.hh>
 #include <shared/gamemode.hh>
 
 #include <glm/gtc/quaternion.hpp>
@@ -825,6 +826,30 @@ void ClientApp::run()
                 auto pos = nexilis::Vector3f({cam_pos.x, cam_pos.y, cam_pos.z});
                 const glm::vec3 forward = camera.getFront();
                 const float yaw = std::atan2(-forward.x, -forward.z);
+
+                if (pos.y < nx3d::kFallDeathY)
+                {
+                    was_below_fall_plane = true;
+                    // UDP movement may be lost. Repeat the out-of-bounds pose
+                    // over TCP until the server has time to register the death.
+                    fall_pose_send_elapsed += delta_time;
+                    if (fall_pose_send_elapsed >= 0.5f)
+                    {
+                        tcp_client.sendMessage(packet::Room::Player3D::position(client_api, pos, yaw));
+                        fall_pose_send_elapsed = 0.0f;
+                    }
+                }
+                else
+                {
+                    if (was_below_fall_plane)
+                    {
+                        // Re-arm the server's fall check after respawn even
+                        // if the first above-ground UDP update is dropped.
+                        tcp_client.sendMessage(packet::Room::Player3D::position(client_api, pos, yaw));
+                        was_below_fall_plane = false;
+                    }
+                    fall_pose_send_elapsed = 0.5f;
+                }
 
                 pose_send_elapsed += delta_time;
                 constexpr float kPositionEpsilon = 0.001f;

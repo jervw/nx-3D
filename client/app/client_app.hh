@@ -103,6 +103,8 @@ public:
     glm::vec3 last_sent_position{0.0f};
     float last_sent_yaw = 0.0f;
     float pose_send_elapsed = 1.0f;
+    float fall_pose_send_elapsed = 0.5f;
+    bool was_below_fall_plane = false;
     std::mutex mtx;
     std::vector<nexilis::RoomInfo> rooms;
     std::atomic<bool> joiningRoom{false};

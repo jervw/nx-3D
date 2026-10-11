@@ -2,6 +2,7 @@
 
 #include <server/gamemode/bomb_mode.hh>
 #include <server/gamemode/deathmatch_mode.hh>
+#include <shared/fall_death.hh>
 
 #include <nexilis/command_type.hh>
 #include <nexilis/logger/log.hh>
@@ -23,10 +24,6 @@ std::unordered_map<uint64_t, std::unordered_set<uint64_t>> GameModeRegistry::m_f
 
 namespace
 {
-// The lowest map vertex is at Y=-192; leave space below it so ordinary drops
-// through the map do not count as deaths.
-constexpr float kFallDeathY = -512.0f;
-
 std::unique_ptr<GameMode> createGameMode(nx3d::GameMode gameMode)
 {
     switch (gameMode)
@@ -82,7 +79,7 @@ void GameModeRegistry::update(float dt)
                 auto* player = nexilis::server::ClientStorage::getClientById(playerId);
                 if (!player)
                     continue;
-                if (player->getObject3D().getPosition().y >= kFallDeathY)
+                if (player->getObject3D().getPosition().y >= nx3d::kFallDeathY)
                 {
                     fallen.erase(playerId);
                     continue;
