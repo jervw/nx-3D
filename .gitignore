@@ -3,3 +3,4 @@
 .clangd
 .env
 compile_commands.json
+dist

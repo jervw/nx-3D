@@ -37,6 +37,15 @@ Run the server first, then the client in another terminal:
 ./build/client/nx_3D_client
 ```
 
+To run only the server with Docker on Linux, initialize the Nexilis submodule and start Compose:
+
+```sh
+git submodule update --init --recursive nexilis
+docker compose up --build -d
+```
+
+Use `docker compose logs -f server` to view its output and `docker compose down` to stop it. Compose uses host networking on Linux. Remote clients need TCP 54200 for authentication, TCP 54202 for the game session, and UDP 54201 for gameplay. Allow these ports through the host firewall and forward them on the router when hosting behind NAT. The client accepts an IPv4 address or hostname in `-server`. The server currently has hardcoded credentials (`password` for players and `root` for administration); change them in `server/server.cc` before exposing it publicly.
+
 The client initially asks for a server address and username. The default address is `127.0.0.1`. You can also start it with `-server <address> -username <name>` to connect immediately. Select a room with the arrow keys and Enter, then choose a team with `1` or `2`.
 
 To reopen the most recent Codex conversation for this repository, run:
@@ -81,6 +90,12 @@ The Bomb Match room starts when at least one player has chosen each team. Team s
 The match uses MR12: twelve rounds per half, side swap after round 12, first to 13 rounds wins, and a 12–12 score after round 24 is a draw. A round lasts 115 seconds. The Terrorists win by eliminating all Counter Terrorists or by letting a planted bomb explode. Counter Terrorists win by eliminating all Terrorists before the bomb is planted, defusing it, or surviving until time expires before a plant. If all Terrorists die after planting, the bomb still needs to be defused. There are five seconds between rounds; a completed match restarts after ten seconds.
 
 The first version uses one shared bomb: any living Terrorist may hold E for three seconds to plant at their current position. A Counter Terrorist within 120 game units of the planted bomb may hold E for five seconds to defuse. Releasing E cancels the action. The bomb explodes 40 seconds after planting. Its current placeholder is a red cube at the planted position, with a square bomb indicator in the HUD; there is no site restriction, dropped bomb, economy, freeze time, or overtime yet. The server checks team, life state, phase, and defuse range, but player positions and hit targets still come from clients.
+
+## Manual releases
+
+Commit and push the default branch, then run `bash scripts/release.sh 0.1.1` (replace the version with the version you want). The script requires GitHub CLI authentication and starts the `manual-release.yml` workflow. Set the repository secret `RELEASE_READ_TOKEN` to a token that can read the private Nexilis and Spear repositories. Watch the run with `gh run list --workflow manual-release.yml`.
+
+After all builds succeed, the workflow updates `VERSION.txt`, tags the release, and publishes four GitHub release assets: Linux and Windows archives for both server and client. Linux clients run `run.sh` from the extracted archive; Windows clients run `run.bat`. The release workflow has no schedule.
 
 ## Verification and release status
 

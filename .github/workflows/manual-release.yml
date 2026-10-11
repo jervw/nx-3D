@@ -1,0 +1,305 @@
+name: Manual game release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (for example 0.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-game-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate release version
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch --tags origin
+          ! git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+  linux:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Check private Nexilis access
+        env:
+          RELEASE_READ_TOKEN: ${{ secrets.RELEASE_READ_TOKEN }}
+        run: test -n "$RELEASE_READ_TOKEN"
+      - name: Read pinned Nexilis commit
+        id: nexilis
+        run: echo "sha=$(git rev-parse HEAD:nexilis)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: Nexilislib/nexilis
+          ref: ${{ steps.nexilis.outputs.sha }}
+          path: nexilis
+          token: ${{ secrets.RELEASE_READ_TOKEN }}
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-json-dev libssl-dev libglm-dev patchelf
+          python3 -m venv "$RUNNER_TEMP/cmake-venv"
+          "$RUNNER_TEMP/cmake-venv/bin/pip" install 'cmake>=3.30,<5'
+          echo "$RUNNER_TEMP/cmake-venv/bin" >> "$GITHUB_PATH"
+      - name: Build and test Linux server
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          CI=1 cmake -S . -B build-release-linux -DCMAKE_BUILD_TYPE=Release \
+            -DNX3D_BUILD_CLIENT=OFF
+          cmake --build build-release-linux --parallel 4
+          ctest --test-dir build-release-linux --output-on-failure
+          python3 scripts/package_linux_server.py --build-dir build-release-linux
+          test -s "dist/nx-3D-server-v${{ needs.prepare.outputs.version }}-linux-x64.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-server
+          path: dist/nx-3D-server-v${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
+          if-no-files-found: error
+
+  linux_client:
+    needs: prepare
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Read pinned submodule commits
+        id: submodules
+        run: |
+          echo "nexilis=$(git rev-parse HEAD:nexilis)" >> "$GITHUB_OUTPUT"
+          echo "spear=$(git rev-parse HEAD:spear)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: Nexilislib/nexilis
+          ref: ${{ steps.submodules.outputs.nexilis }}
+          path: nexilis
+          token: ${{ secrets.RELEASE_READ_TOKEN }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: NeuronActivation/spear
+          ref: ${{ steps.submodules.outputs.spear }}
+          path: spear
+          token: ${{ secrets.RELEASE_READ_TOKEN }}
+          persist-credentials: false
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libboost-json-dev libssl-dev libglm-dev patchelf \
+            libvulkan-dev libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev \
+            libsdl3-mixer-dev libglew-dev libbullet-dev libshaderc-dev \
+            glslang-dev spirv-tools-dev pkg-config libgl-dev
+          python3 -m venv "$RUNNER_TEMP/cmake-venv"
+          "$RUNNER_TEMP/cmake-venv/bin/pip" install 'cmake>=3.30,<5'
+          echo "$RUNNER_TEMP/cmake-venv/bin" >> "$GITHUB_PATH"
+      - name: Build and package Linux client
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          CI=1 cmake -S . -B build-release-linux-client -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF -DNX3D_PORTABLE_CLIENT=ON
+          cmake --build build-release-linux-client --target nx_3D_client --parallel 4
+          python3 scripts/package_linux_client.py --build-dir build-release-linux-client
+          test -s "dist/nx-3D-client-v${RELEASE_VERSION}-linux-x64.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-client
+          path: dist/nx-3D-client-v${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
+          if-no-files-found: error
+
+  windows:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Check private Nexilis access
+        env:
+          RELEASE_READ_TOKEN: ${{ secrets.RELEASE_READ_TOKEN }}
+        run: test -n "$RELEASE_READ_TOKEN"
+      - name: Read pinned Nexilis commit
+        id: nexilis
+        run: echo "sha=$(git rev-parse HEAD:nexilis)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: Nexilislib/nexilis
+          ref: ${{ steps.nexilis.outputs.sha }}
+          path: nexilis
+          token: ${{ secrets.RELEASE_READ_TOKEN }}
+          persist-credentials: false
+      - name: Install cross compiler and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-mingw-w64-x86-64-posix \
+            binutils-mingw-w64-x86-64 libboost-json-dev perl zip unzip file
+          python3 -m venv "$RUNNER_TEMP/cmake-venv"
+          "$RUNNER_TEMP/cmake-venv/bin/pip" install 'cmake>=3.30,<5'
+          echo "$RUNNER_TEMP/cmake-venv/bin" >> "$GITHUB_PATH"
+      - name: Build Windows server and bundle DLLs
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          bash scripts/build_windows_server.sh
+          test -s "dist/nx-3D-server-v${{ needs.prepare.outputs.version }}-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-server
+          path: dist/nx-3D-server-v${{ needs.prepare.outputs.version }}-windows-x64.zip
+          if-no-files-found: error
+
+  windows_client:
+    needs: prepare
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Check private submodule access
+        env:
+          RELEASE_READ_TOKEN: ${{ secrets.RELEASE_READ_TOKEN }}
+        shell: bash
+        run: test -n "$RELEASE_READ_TOKEN"
+      - name: Read pinned submodule commits
+        id: submodules
+        shell: bash
+        run: |
+          echo "nexilis=$(git rev-parse HEAD:nexilis)" >> "$GITHUB_OUTPUT"
+          echo "spear=$(git rev-parse HEAD:spear)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: Nexilislib/nexilis
+          ref: ${{ steps.submodules.outputs.nexilis }}
+          path: nexilis
+          token: ${{ secrets.RELEASE_READ_TOKEN }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: NeuronActivation/spear
+          ref: ${{ steps.submodules.outputs.spear }}
+          path: spear
+          token: ${{ secrets.RELEASE_READ_TOKEN }}
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git python zip unzip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-sdl3
+            mingw-w64-ucrt-x86_64-sdl3-image
+            mingw-w64-ucrt-x86_64-sdl3-ttf
+            mingw-w64-ucrt-x86_64-sdl3-mixer
+            mingw-w64-ucrt-x86_64-glew
+            mingw-w64-ucrt-x86_64-vulkan-headers
+            mingw-w64-ucrt-x86_64-vulkan-loader
+            mingw-w64-ucrt-x86_64-bullet
+            mingw-w64-ucrt-x86_64-glm
+            mingw-w64-ucrt-x86_64-glslang
+            mingw-w64-ucrt-x86_64-spirv-tools
+            mingw-w64-ucrt-x86_64-shaderc
+      - name: Build and package Windows client
+        shell: msys2 {0}
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          CI=1 cmake -S . -B build-release-windows-client -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+            -DNX3D_PORTABLE_CLIENT=ON
+          cmake --build build-release-windows-client --target nx_3D_client --parallel 4
+          bash scripts/package_windows_client.sh build-release-windows-client
+          test -s "dist/nx-3D-client-v${{ needs.prepare.outputs.version }}-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-client
+          path: dist/nx-3D-client-v${{ needs.prepare.outputs.version }}-windows-x64.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, linux, linux_client, windows, windows_client]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+          path: release-assets
+      - name: Check all release archives
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          test -s "release-assets/nx-3D-server-v${RELEASE_VERSION}-linux-x64.tar.gz"
+          test -s "release-assets/nx-3D-server-v${RELEASE_VERSION}-windows-x64.zip"
+          test -s "release-assets/nx-3D-client-v${RELEASE_VERSION}-linux-x64.tar.gz"
+          test -s "release-assets/nx-3D-client-v${RELEASE_VERSION}-windows-x64.zip"
+          tar -tzf "release-assets/nx-3D-server-v${RELEASE_VERSION}-linux-x64.tar.gz" | grep -q nx-3D-server
+          tar -tzf "release-assets/nx-3D-client-v${RELEASE_VERSION}-linux-x64.tar.gz" | grep -q nx_3D_client
+          unzip -t "release-assets/nx-3D-server-v${RELEASE_VERSION}-windows-x64.zip" | tail -1
+          unzip -t "release-assets/nx-3D-client-v${RELEASE_VERSION}-windows-x64.zip" | tail -1
+      - name: Commit version and tag after successful builds
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add VERSION.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Release $RELEASE_TAG"
+          fi
+          git tag -a "$RELEASE_TAG" -m "nx-3D $RELEASE_TAG"
+          git push --atomic origin "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$RELEASE_TAG"
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" release-assets/* --verify-tag \
+            --title "nx-3D $RELEASE_VERSION" --generate-notes
