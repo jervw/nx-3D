@@ -1,0 +1,17 @@
+.git
+.agents
+.aws
+.codex
+.github
+.cache
+build
+dist
+client
+spear
+tests
+scripts
+**/build
+**/build_linux
+**/.cache
+**/__pycache__
+**/.git

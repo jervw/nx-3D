@@ -1,0 +1,7 @@
+services:
+  server:
+    build: .
+    network_mode: host
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
