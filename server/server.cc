@@ -20,8 +20,10 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <functional>
 #include <iostream>
+#include <pthread.h>
 
 namespace
 {
@@ -37,6 +39,16 @@ nexilis::server::Room createRoom(const std::string& name)
 
 int main()
 {
+    sigset_t shutdownSignals;
+    sigemptyset(&shutdownSignals);
+    sigaddset(&shutdownSignals, SIGINT);
+    sigaddset(&shutdownSignals, SIGTERM);
+    if (pthread_sigmask(SIG_BLOCK, &shutdownSignals, nullptr) != 0)
+    {
+        std::cerr << "Failed to block shutdown signals" << std::endl;
+        return 1;
+    }
+
     nexilis::Log::startConsoleDebugging();
 
     using namespace nexilis::server;
@@ -104,10 +116,13 @@ int main()
     auto server_runtime = std::thread([&condition, &f](){ nexilis::server::runtime(condition, f, 60); });
     // clang-format on
 
-    // Wait for user input to stop the server
-    std::cout << "Nx3D game server is running. Press Enter to stop..."
+    std::cout << "Nx3D game server is running. Waiting for SIGINT or SIGTERM..."
               << std::endl;
-    std::cin.get();
+    int shutdownSignal = 0;
+    const int signalError = sigwait(&shutdownSignals, &shutdownSignal);
+    if (signalError != 0)
+        std::cerr << "Failed to wait for shutdown signal: " << signalError << std::endl;
     running.store(false);
     server_runtime.join();
+    return signalError == 0 ? 0 : 1;
 }
