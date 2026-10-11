@@ -1025,8 +1025,7 @@ void ClientApp::syncRemotePlayerTransforms(float deltaTime)
                                      position.z - motion.position.z);
             const float distance = glm::length(movement);
             const float speed = dt > 0.0f && distance < 40.0f ? distance / dt : 0.0f;
-            motion.facing += std::remainder(player.yaw - motion.facing, 6.2831853f) *
-                             std::min(1.0f, dt * 12.0f);
+            motion.facing = player.yaw;
             motion.speed += (std::clamp(speed / 250.0f, 0.0f, 1.0f) - motion.speed) *
                             std::min(1.0f, dt * 10.0f);
             motion.stride += motion.speed * dt * 7.0f;
