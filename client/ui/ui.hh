@@ -107,6 +107,7 @@ public:
     spear::ui::vulkan::Text healthText;
     spear::ui::vulkan::Text weaponHudText;
     spear::ui::vulkan::Text hitmarkerText;
+    spear::ui::vulkan::Text wastedText;
     spear::ui::vulkan::Text teamDisplayText;
     spear::ui::vulkan::Text roundText;
     spear::ui::vulkan::Text matchStatusText;

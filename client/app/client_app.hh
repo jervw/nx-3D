@@ -21,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace nx3d::client
@@ -99,6 +100,9 @@ public:
     nexilis::TCPClient tcp_client;
     nexilis::UDPClient udp_client;
     std::atomic<bool> ready{false};
+    glm::vec3 last_sent_position{0.0f};
+    float last_sent_yaw = 0.0f;
+    float pose_send_elapsed = 1.0f;
     std::mutex mtx;
     std::vector<nexilis::RoomInfo> rooms;
     std::atomic<bool> joiningRoom{false};
@@ -135,6 +139,26 @@ public:
     // --- Remote entities (network sync) --------------------------------------
     std::unordered_map<uint64_t, std::shared_ptr<spear::rendering::vulkan::OBJModel>> remote_players;
     std::unordered_map<uint64_t, std::string> remote_player_teams;
+    struct RemotePlayerAnimation
+    {
+        glm::vec3 position{0.0f};
+        float facing = 0.0f;
+        float stride = 0.0f;
+        float speed = 0.0f;
+        float hitTime = 0.0f;
+        bool initialized = false;
+    };
+    struct DeathAnimation
+    {
+        std::shared_ptr<spear::rendering::vulkan::OBJModel> model;
+        glm::vec3 position{0.0f};
+        float facing = 0.0f;
+        float elapsed = 0.0f;
+    };
+    std::unordered_map<uint64_t, RemotePlayerAnimation> remote_player_animations;
+    std::unordered_set<uint64_t> remote_dead_players;
+    std::vector<DeathAnimation> death_animations;
+    float player_animation_clock = 0.0f;
     std::unordered_map<uint64_t, std::shared_ptr<spear::rendering::vulkan::TexturedCube>> remote_objects;
     std::unordered_map<uint64_t, std::shared_ptr<spear::rendering::vulkan::OBJModel>> remote_game_items;
     std::vector<std::shared_ptr<spear::GameObject>> pendingDestroy[3];
@@ -183,6 +207,9 @@ public:
     // --- Helpers ----------------------------------------------------------------
     void connect(const std::string& address);
     void enterGame(const std::string& team);
+    void animatePlayerHit(uint64_t playerId);
+    void animatePlayerDeath(uint64_t playerId);
+    void animatePlayerRespawn(uint64_t playerId);
     void applyAudioVolume();
     void changeVolume(float delta);
     void setVolumeNormalized(float normalized);
@@ -193,7 +220,7 @@ public:
 private:
     std::unique_ptr<gamemode::GameMode> makeGameMode(nx3d::GameMode gameMode);
     void setupScenes();
-    void syncRemotePlayerTransforms();
+    void syncRemotePlayerTransforms(float deltaTime);
     void syncRemoteObjects();
     void syncRemoteGameItems();
 };

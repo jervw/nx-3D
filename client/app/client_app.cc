@@ -14,6 +14,8 @@
 
 #include <shared/gamemode.hh>
 
+#include <glm/gtc/quaternion.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -282,6 +284,7 @@ std::unique_ptr<gamemode::GameMode> ClientApp::makeGameMode(nx3d::GameMode gameM
 
 void ClientApp::enterGame(const std::string& team)
 {
+    pose_send_elapsed = 1.0f;
     ui->showGameHudTexts();
     renderer.setUIRenderer(&ui->renderer());
     scene_manager.loadScene(game_scene_id);
@@ -820,18 +823,24 @@ void ClientApp::run()
             {
                 auto cam_pos = camera.getPosition();
                 auto pos = nexilis::Vector3f({cam_pos.x, cam_pos.y, cam_pos.z});
+                const glm::vec3 forward = camera.getFront();
+                const float yaw = std::atan2(-forward.x, -forward.z);
 
-                static nexilis::Vector3f lastSentPosition = {0.0f, 0.0f, 0.0f};
+                pose_send_elapsed += delta_time;
                 constexpr float kPositionEpsilon = 0.001f;
-                if (std::abs(pos.x - lastSentPosition.x) > kPositionEpsilon ||
-                    std::abs(pos.y - lastSentPosition.y) > kPositionEpsilon ||
-                    std::abs(pos.z - lastSentPosition.z) > kPositionEpsilon)
+                if (std::abs(pos.x - last_sent_position.x) > kPositionEpsilon ||
+                    std::abs(pos.y - last_sent_position.y) > kPositionEpsilon ||
+                    std::abs(pos.z - last_sent_position.z) > kPositionEpsilon ||
+                    std::abs(std::remainder(yaw - last_sent_yaw, 6.2831853f)) > 0.01f ||
+                    pose_send_elapsed >= 1.0f)
                 {
-                    udp_client.sendMessage(packet::Room::Player3D::position(client_api, pos));
-                    lastSentPosition = pos;
+                    udp_client.sendMessage(packet::Room::Player3D::position(client_api, pos, yaw));
+                    last_sent_position = cam_pos;
+                    last_sent_yaw = yaw;
+                    pose_send_elapsed = 0.0f;
                 }
 
-                syncRemotePlayerTransforms();
+                syncRemotePlayerTransforms(delta_time);
                 syncRemoteObjects();
                 syncRemoteGameItems();
                 updateChatMessages();
@@ -856,8 +865,88 @@ void ClientApp::run()
     }
 }
 
-void ClientApp::syncRemotePlayerTransforms()
+void ClientApp::animatePlayerHit(uint64_t playerId)
 {
+    if (!remote_dead_players.contains(playerId))
+        remote_player_animations[playerId].hitTime = 0.22f;
+}
+
+void ClientApp::animatePlayerDeath(uint64_t playerId)
+{
+    if (!remote_dead_players.insert(playerId).second)
+        return;
+
+    auto it = remote_players.find(playerId);
+    if (it == remote_players.end())
+        return;
+
+    const auto& motion = remote_player_animations[playerId];
+    if (auto* body = it->second->getRigidBody())
+    {
+        shared_world->removeRigidBody(body);
+        it->second->setCollisionSize(btVector3(18.0f, 38.0f, 14.0f));
+        btVector3 inertia(0.0f, 0.0f, 0.0f);
+        body->getCollisionShape()->calculateLocalInertia(65.0f, inertia);
+        body->setMassProps(65.0f, inertia);
+        body->updateInertiaTensor();
+        body->setCollisionFlags(body->getCollisionFlags() & ~btCollisionObject::CF_STATIC_OBJECT);
+        btTransform transform;
+        transform.setIdentity();
+        transform.setOrigin(btVector3(motion.position.x, motion.position.y - 26.0f,
+                                      motion.position.z));
+        transform.setRotation(btQuaternion(btVector3(0.0f, 1.0f, 0.0f), motion.facing));
+        body->setWorldTransform(transform);
+        body->getMotionState()->setWorldTransform(transform);
+        body->setDamping(0.35f, 0.45f);
+        body->setGravity(btVector3(0.0f, -450.0f, 0.0f));
+        shared_world->addRigidBody(body);
+        body->setLinearVelocity(btVector3(-std::sin(motion.facing) * 105.0f, 55.0f,
+                                          -std::cos(motion.facing) * 105.0f));
+        body->setAngularVelocity(btVector3(3.2f, 0.8f, 1.0f));
+        body->activate();
+    }
+    death_animations.push_back({std::move(it->second), motion.position, motion.facing, 0.0f});
+    remote_players.erase(it);
+    remote_player_animations.erase(playerId);
+}
+
+void ClientApp::animatePlayerRespawn(uint64_t playerId)
+{
+    remote_dead_players.erase(playerId);
+    remote_player_animations.erase(playerId);
+}
+
+void ClientApp::syncRemotePlayerTransforms(float deltaTime)
+{
+    const float dt = std::clamp(deltaTime, 0.0f, 0.05f);
+    player_animation_clock += dt;
+
+    for (auto it = death_animations.begin(); it != death_animations.end();)
+    {
+        it->elapsed += dt;
+        if (it->elapsed >= 2.5f)
+        {
+            scene_manager.getCurrentScene()->removeObject(it->model->getId());
+            pendingDestroy[(frameCount - 1) % 3].push_back(std::move(it->model));
+            it = death_animations.erase(it);
+            continue;
+        }
+
+        if (auto* body = it->model->getRigidBody())
+        {
+            btTransform transform;
+            body->getMotionState()->getWorldTransform(transform);
+            const auto& origin = transform.getOrigin();
+            const auto& rotation = transform.getRotation();
+            glm::mat4 pose = glm::translate(glm::mat4(1.0f),
+                                            glm::vec3(origin.x(), origin.y(), origin.z()));
+            pose *= glm::mat4_cast(glm::quat(rotation.w(), rotation.x(), rotation.y(), rotation.z()));
+            pose = glm::translate(pose, glm::vec3(0.0f, 26.0f, 0.0f));
+            it->model->setModel(pose);
+        }
+        ++it;
+    }
+
     auto room_id = client_api.clientRoomId();
     auto my_id = client_api.getClientId();
     auto players = client_api.getRemotePlayersSnapshot(room_id, my_id);
@@ -870,12 +959,15 @@ void ClientApp::syncRemotePlayerTransforms()
         // the server swaps sides at halftime.
         if (team.empty())
             continue;
+        if (remote_dead_players.contains(player.id))
+            continue;
         auto existing = remote_players.find(player.id);
         if (existing != remote_players.end() && remote_player_teams[player.id] != team)
         {
             scene_manager.getCurrentScene()->removeObject(existing->second->getId());
             pendingDestroy[(frameCount - 1) % 3].push_back(std::move(existing->second));
             remote_players.erase(existing);
+            remote_player_animations.erase(player.id);
         }
         if (remote_players.find(player.id) == remote_players.end())
         {
@@ -913,6 +1005,7 @@ void ClientApp::syncRemotePlayerTransforms()
     {
         remote_players.erase(id);
         remote_player_teams.erase(id);
+        remote_player_animations.erase(id);
     }
 
     for (auto& player : players)
@@ -920,9 +1013,46 @@ void ClientApp::syncRemotePlayerTransforms()
         auto it = remote_players.find(player.id);
         if (it != remote_players.end())
         {
-            it->second->setPosition(
-                    {player.x, player.y, player.z});
+            const glm::vec3 position(player.x, player.y, player.z);
+            auto& motion = remote_player_animations[player.id];
+            if (!motion.initialized)
+            {
+                motion.position = position;
+                motion.initialized = true;
+            }
+
+            const glm::vec2 movement(position.x - motion.position.x,
+                                     position.z - motion.position.z);
+            const float distance = glm::length(movement);
+            const float speed = dt > 0.0f && distance < 40.0f ? distance / dt : 0.0f;
+            motion.facing += std::remainder(player.yaw - motion.facing, 6.2831853f) *
+                             std::min(1.0f, dt * 12.0f);
+            motion.speed += (std::clamp(speed / 250.0f, 0.0f, 1.0f) - motion.speed) *
+                            std::min(1.0f, dt * 10.0f);
+            motion.stride += motion.speed * dt * 7.0f;
+            motion.hitTime = std::max(0.0f, motion.hitTime - dt);
+            motion.position = position;
+
+            const float bob = std::sin(motion.stride * 2.0f) * 0.9f * motion.speed +
+                              std::sin(player_animation_clock * 2.5f) * 0.22f * (1.0f - motion.speed);
+            glm::mat4 pose = glm::translate(glm::mat4(1.0f), position + glm::vec3(0.0f, bob, 0.0f));
+            pose = glm::rotate(pose, motion.facing, glm::vec3(0.0f, 1.0f, 0.0f));
+            pose = glm::rotate(pose, std::sin(motion.stride) * 0.045f * motion.speed,
+                               glm::vec3(1.0f, 0.0f, 0.0f));
+            pose = glm::rotate(pose, std::sin(motion.stride) * 0.035f * motion.speed + std::sin(motion.hitTime / 0.22f * 3.14159f) * 0.14f,
+                               glm::vec3(0.0f, 0.0f, 1.0f));
+            it->second->setModel(pose);
         }
+    }
+
+    for (auto it = remote_dead_players.begin(); it != remote_dead_players.end();)
+    {
+        if (std::none_of(players.begin(), players.end(),
+                         [id = *it](const auto& player)
+                         { return player.id == id; }))
+            it = remote_dead_players.erase(it);
+        else
+            ++it;
     }
 }
 

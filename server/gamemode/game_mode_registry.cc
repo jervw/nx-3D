@@ -3,18 +3,29 @@
 #include <server/gamemode/bomb_mode.hh>
 #include <server/gamemode/deathmatch_mode.hh>
 
+#include <nexilis/command_type.hh>
 #include <nexilis/logger/log.hh>
+#include <nexilis/room_command_type.hh>
+#include <nexilis/server/client_storage.hh>
+#include <nexilis/server/command/command.hh>
 #include <nexilis/server/room_storage.hh>
 
+#include <boost/json/value.hpp>
+
+#include <map>
 #include <utility>
 
 namespace nx3d::server::gamemode
 {
 
 std::unordered_map<uint64_t, std::unique_ptr<GameMode>> GameModeRegistry::m_modes;
+std::unordered_map<uint64_t, std::unordered_set<uint64_t>> GameModeRegistry::m_fallenPlayers;
 
 namespace
 {
+// The lowest map vertex is at Y=-192; leave space below it so ordinary drops
+// through the map do not count as deaths.
+constexpr float kFallDeathY = -512.0f;
 
 std::unique_ptr<GameMode> createGameMode(nx3d::GameMode gameMode)
 {
@@ -41,6 +52,7 @@ std::unique_ptr<GameMode> createGameMode(nx3d::GameMode gameMode)
 
 void GameModeRegistry::assignRoom(nexilis::server::Room& room, nx3d::GameMode gameMode)
 {
+    m_fallenPlayers.erase(room.getId());
     auto mode = createGameMode(gameMode);
     auto* modePtr = mode.get();
 
@@ -63,13 +75,49 @@ void GameModeRegistry::update(float dt)
     for (auto& [roomId, mode] : m_modes)
     {
         if (auto* room = nexilis::server::RoomStorage::getRoomById(roomId))
+        {
+            auto& fallen = m_fallenPlayers[roomId];
+            for (auto playerId : room->getClients())
+            {
+                auto* player = nexilis::server::ClientStorage::getClientById(playerId);
+                if (!player)
+                    continue;
+                if (player->getObject3D().getPosition().y >= kFallDeathY)
+                {
+                    fallen.erase(playerId);
+                    continue;
+                }
+                if (room->getPlayerTeam(playerId).empty() ||
+                    room->getPlayerHealth(playerId) <= 0.0f || !fallen.insert(playerId).second)
+                    continue;
+
+                const float health = room->getPlayerHealth(playerId);
+                if (!room->damagePlayer(playerId, health))
+                    continue;
+
+                // Use the usual damage event so the victim's HUD updates in
+                // modes that leave dead players waiting for a new round.
+                nexilis::nx_data damageData{
+                        static_cast<uint8_t>(nexilis::CommandType::room),
+                        static_cast<uint8_t>(nexilis::RoomCommandType::Root::player_3D),
+                        static_cast<uint8_t>(nexilis::RoomCommandType::PlayerType::shoot)};
+                std::map<std::string, boost::json::value> params{
+                        {"target_id", boost::json::value(playerId)},
+                        {"damage", boost::json::value(static_cast<double>(health))},
+                        {"new_health", boost::json::value(0.0)}};
+                room->broadcastToAll(nexilis::server::Command::createRoomCommand(
+                        roomId, *player, damageData, params, 0));
+                room->onPlayerDied(0, playerId);
+            }
             mode->update(*room, dt);
+        }
     }
 }
 
 void GameModeRegistry::clear()
 {
     m_modes.clear();
+    m_fallenPlayers.clear();
 }
 
 } // namespace nx3d::server::gamemode

@@ -134,11 +134,15 @@ void BombMode::onPlayerDeath(nexilis::server::Room& room, uint64_t killerId, uin
     if (m_actionPlayer == victimId)
         clearAction();
     room.recordKill(killerId, victimId);
-    auto* killer = nexilis::server::ClientStorage::getClientById(killerId);
-    if (killer)
+    auto* sender = nexilis::server::ClientStorage::getClientById(
+            killerId == 0 ? victimId : killerId);
+    if (sender)
         room.broadcastToAll(nexilis::server::Command::createRoomLeaderboardCommand(
-                room.getId(), *killer,
-                nexilis::server::Command::playerStatsEntries(room, {killerId, victimId}), 0));
+                room.getId(), *sender,
+                nexilis::server::Command::playerStatsEntries(
+                        room, killerId == 0 ? std::vector<uint64_t>{victimId}
+                                            : std::vector<uint64_t>{killerId, victimId}),
+                0));
     if (!teamAlive(room, kCT))
         endRound(room, true, "Counter Terrorists eliminated");
     else if (!teamAlive(room, kT) && !m_planted)

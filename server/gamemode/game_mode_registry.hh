@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace nx3d::server::gamemode
 {
@@ -32,6 +33,7 @@ public:
 
 private:
     static std::unordered_map<uint64_t, std::unique_ptr<GameMode>> m_modes;
+    static std::unordered_map<uint64_t, std::unordered_set<uint64_t>> m_fallenPlayers;
 };
 
 } // namespace nx3d::server::gamemode

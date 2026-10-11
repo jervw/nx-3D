@@ -59,6 +59,8 @@ Ui::Ui(VkDevice device,
                     descriptorPool, descriptorSetLayout, fontPath, 20),
       hitmarkerText(device, physDevice, commandPool, graphicsQueue,
                     descriptorPool, descriptorSetLayout, fontPath, 28),
+      wastedText(device, physDevice, commandPool, graphicsQueue,
+                 descriptorPool, descriptorSetLayout, fontPath, 64),
       teamDisplayText(device, physDevice, commandPool, graphicsQueue,
                       descriptorPool, descriptorSetLayout, fontPath, 20),
       roundText(device, physDevice, commandPool, graphicsQueue,
@@ -168,6 +170,10 @@ Ui::Ui(VkDevice device,
     hitmarkerText.setColor(SDL_Color{255, 255, 255, 255});
     hitmarkerText.setPosition(glm::vec2(-0.025f, -0.025f));
     hitmarkerText.setScale(0.003f);
+
+    wastedText.setString("");
+    wastedText.setColor(SDL_Color{210, 35, 35, 255});
+    wastedText.setPosition(glm::vec2(-0.27f, 0.0f));
 
     teamDisplayText.setString("");
     teamDisplayText.setColor(SDL_Color{255, 255, 255, 255});
@@ -444,6 +450,7 @@ void Ui::showGameHudTexts()
     registerText(healthText);
     registerText(weaponHudText);
     registerText(hitmarkerText);
+    registerText(wastedText);
     registerText(teamDisplayText);
     registerText(roundText);
     registerText(matchStatusText);

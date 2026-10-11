@@ -1,5 +1,6 @@
 #include <client/app/client_app.hh>
 #include <client/gamemode/deathmatch_mode.hh>
+#include <client/gamemode/player_hit_test.hh>
 #include <client/gamemode/weapon_profiles.hh>
 
 #include <nexilis/client/packet.hh>
@@ -56,6 +57,7 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
 
     m_health = 100;
     app.ui->healthText.setString("HP: " + std::to_string(m_health));
+    app.ui->wastedText.setString("");
     m_prevCamPos = app.camera.getPosition();
 
     m_weaponPickedUp = true;
@@ -83,6 +85,9 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
         m_hitmarkerFrames--;
         app.ui->hitmarkerText.setString(m_hitmarkerFrames > 0 ? "X" : "");
     }
+    const std::string deathText = m_health <= 0 ? "WASTED" : "";
+    if (app.ui->wastedText.getString() != deathText)
+        app.ui->wastedText.setString(deathText);
 
     // Play the hitmarker sound shortly after a hit (handled in the shared
     // GameMode base so it works in every gamemode).
@@ -105,7 +110,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
         m_firstPersonGun->updateAnimation(delta_time, velocity, app.movement_controller.isOnGround());
 
     // --- Automatic fire while the trigger is held ---
-    if (m_triggerHeld && m_weaponPickedUp)
+    if (m_health > 0 && m_triggerHeld && m_weaponPickedUp)
     {
         m_fireCooldown -= delta_time;
         // A while loop keeps the cadence correct even after a big frame time.
@@ -117,7 +122,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
     }
 
     // --- Pickup nearby dropped weapons ---
-    if (!m_weaponPickedUp && m_dropCooldown == 0 && app.ready && app.client_api.clientInRoom())
+    if (m_health > 0 && !m_weaponPickedUp && m_dropCooldown == 0 && app.ready && app.client_api.clientInRoom())
     {
         glm::vec3 camPos = app.camera.getPosition();
         auto game_items = app.client_api.getRemoteGameItemsSnapshot(app.client_api.clientRoomId());
@@ -167,10 +172,21 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             if (m_health < 0)
                 m_health = 0;
             app.ui->healthText.setString("HP: " + std::to_string(m_health));
+            if (m_health == 0)
+                m_triggerHeld = false;
+            app.camera.addRecoilOffset(m_health == 0 ? -7.0f : -1.5f, 0.0f);
         }
-        else if (evt.damage > 0.0f)
+        else if (evt.shooter_id == app.client_api.getClientId() && evt.damage > 0.0f)
         {
             m_hitmarkerFrames = 15;
+            triggerHitmarkerSound();
+        }
+        if (evt.target_id != app.client_api.getClientId())
+        {
+            if (evt.new_health <= 0.0f)
+                app.animatePlayerDeath(evt.target_id);
+            else
+                app.animatePlayerHit(evt.target_id);
         }
     }
 
@@ -191,6 +207,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
                 m_firstPersonGun->resetAnimation();
             m_health = 100;
             app.ui->healthText.setString("HP: " + std::to_string(m_health));
+            app.ui->wastedText.setString("");
             m_ammo = m_magazineSize;
             m_reloadRemaining = 0.0f;
             if (app.reload_audio)
@@ -202,6 +219,10 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
                 m_weaponPickedUp = true;
                 equipWeaponForTeam(app);
             }
+        }
+        else
+        {
+            app.animatePlayerRespawn(evt.target_id);
         }
     }
 
@@ -232,7 +253,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
 
 void DeathmatchMode::handleMouseButtonDown(ClientApp& app, const SDL_Event& event)
 {
-    if (!m_weaponPickedUp || event.button.button != SDL_BUTTON_LEFT)
+    if (m_health <= 0 || !m_weaponPickedUp || event.button.button != SDL_BUTTON_LEFT)
         return;
     if (m_reloadRemaining > 0.0f || m_ammo == 0)
         return;
@@ -317,61 +338,19 @@ void DeathmatchMode::fireWeapon(ClientApp& app)
 
     for (auto& player : players)
     {
-        glm::vec3 center(player.x, player.y, player.z);
-        // Remote-player positions are at eye height. Match the low-poly
-        // figure's full head-to-boot silhouette instead of its old cube.
-        glm::vec3 boxMin = center + glm::vec3(-18.0f, -64.0f, -9.0f);
-        glm::vec3 boxMax = center + glm::vec3(18.0f, 12.0f, 9.0f);
-
-        float tmin = -std::numeric_limits<float>::max();
-        float tmax = std::numeric_limits<float>::max();
-        bool miss = false;
-
-        for (int i = 0; i < 3; i++)
+        if (app.remote_dead_players.contains(player.id))
+            continue;
+        const float distance = playerHitDistance(rayOrigin, rayDir,
+                                                 {player.x, player.y, player.z}, player.yaw);
+        if (distance < closestDist)
         {
-            float origin_i = (&rayOrigin.x)[i];
-            float dir_i = (&rayDir.x)[i];
-            float min_i = (&boxMin.x)[i];
-            float max_i = (&boxMax.x)[i];
-
-            if (std::abs(dir_i) < 1e-8f)
-            {
-                if (origin_i < min_i || origin_i > max_i)
-                {
-                    miss = true;
-                    break;
-                }
-            }
-            else
-            {
-                float invD = 1.0f / dir_i;
-                float t1 = (min_i - origin_i) * invD;
-                float t2 = (max_i - origin_i) * invD;
-                if (t1 > t2)
-                    std::swap(t1, t2);
-                tmin = std::max(tmin, t1);
-                tmax = std::min(tmax, t2);
-                if (tmin > tmax)
-                {
-                    miss = true;
-                    break;
-                }
-            }
-        }
-
-        if (!miss && tmin >= 0.0f && tmin < closestDist)
-        {
-            closestDist = tmin;
+            closestDist = distance;
             hitTargetId = player.id;
         }
     }
 
     if (hitTargetId != 0)
     {
-        // Fire the hitmarker sound a little later (in update()) so it is
-        // not drowned out by the gunshot sound that was just started.
-        triggerHitmarkerSound();
-
         app.tcp_client.sendMessage(
                 packet::Room::Player3D::shoot(app.client_api, hitTargetId, 35.0f));
     }
@@ -383,9 +362,9 @@ void DeathmatchMode::handleKeyDown(ClientApp& app, const SDL_Event& event)
     if (event.key.repeat)
         return;
 
-    if (event.key.key == SDLK_R && m_weaponPickedUp)
+    if (event.key.key == SDLK_R && m_health > 0 && m_weaponPickedUp)
         startReload(app);
-    else if (event.key.key == SDLK_G && m_weaponPickedUp)
+    else if (event.key.key == SDLK_G && m_health > 0 && m_weaponPickedUp)
         dropCurrentWeapon(app);
     else if (event.key.key == SDLK_TAB && app.client_api.clientInRoom())
     {
@@ -454,7 +433,7 @@ void DeathmatchMode::equipGun(ClientApp& app,
         if (app.ui->isLeaderboardVisible())
             app.ui->renderLeaderboardOverlay(ctx);
         app.ui->renderChatOverlay(ctx);
-        if (m_crosshair)
+        if (m_crosshair && m_health > 0)
             m_crosshair->render(app.camera); });
 
     m_weaponName = weaponName;

@@ -19,9 +19,16 @@ void require(bool condition, const char* message)
 class TestProtocol : public nexilis::Protocol
 {
 public:
-    void start() override {}
-    void stop() override {}
-    Type getType() override { return Type::BOOST_TCP_SERVER; }
+    void start() override
+    {
+    }
+    void stop() override
+    {
+    }
+    Type getType() override
+    {
+        return Type::BOOST_TCP_SERVER;
+    }
 };
 } // namespace
 
@@ -41,10 +48,8 @@ int main()
             user->setRoomId(777);
             user->setUsername("player_" + std::to_string(id));
             user->setBoostTCPSend([&api](const nx_data& data)
-            {
-                require(api.readMessage(data) == client::ReadResult::success,
-                        "Client rejected deathmatch message");
-            });
+                                  { require(api.readMessage(data) == client::ReadResult::success,
+                                            "Client rejected deathmatch message"); });
             server::ClientStorage::add(std::move(user));
         };
         addUser(10, shooter);
@@ -71,9 +76,13 @@ int main()
             {
                 auto packet = client::Packet::Room::Player3D::shoot(shooter, 20, 35.0f);
                 nx_data payload(packet.begin() + 16, packet.end());
-                require(command.read(payload, *server::ClientStorage::getClientById(10), protocol, 1)
-                            == server::CommandResult::success, "Shot rejected");
+                require(command.read(payload, *server::ClientStorage::getClientById(10), protocol, 1) == server::CommandResult::success, "Shot rejected");
             }
+            require(room->getPlayerHealth(20) == 0.0f, "Victim did not stay dead");
+            require(victim.consumeRespawnEvents().empty(), "Victim respawned too early");
+            Registry::update(2.4f);
+            require(room->getPlayerHealth(20) == 0.0f, "Respawn delay was too short");
+            Registry::update(0.2f);
             require(room->getPlayerHealth(20) == 100.0f, "Victim was not revived");
             require(room->getPlayerKills(10) == kill, "Kill count incorrect");
             require(room->getPlayerDeaths(20) == kill, "Death count incorrect");
@@ -90,6 +99,24 @@ int main()
                 require(api->consumeRespawnEvents().empty(), "Respawn consumed twice");
             }
         }
+
+        auto* fallingPlayer = server::ClientStorage::getClientById(20);
+        fallingPlayer->getObject3D().setPosition(Vector3f{0.0f, -600.0f, 0.0f});
+        Registry::update(1.0f / 60.0f);
+        require(room->getPlayerDeaths(20) == 101, "Falling did not count as a death");
+        require(room->getPlayerKills(10) == 100, "Falling credited another player with a kill");
+        require(victim.consumeDamageEvents().size() == 1, "Falling did not send damage");
+        require(victim.consumeRespawnEvents().empty(), "Falling respawned too early");
+        Registry::update(2.6f);
+        require(victim.consumeRespawnEvents().size() == 1, "Falling did not respawn the victim");
+
+        Registry::update(1.0f / 60.0f);
+        require(room->getPlayerDeaths(20) == 101, "One fall caused multiple deaths");
+        fallingPlayer->getObject3D().setPosition(Vector3f{0.0f, 0.0f, 0.0f});
+        Registry::update(1.0f / 60.0f);
+        fallingPlayer->getObject3D().setPosition(Vector3f{0.0f, -600.0f, 0.0f});
+        Registry::update(1.0f / 60.0f);
+        require(room->getPlayerDeaths(20) == 102, "A later fall did not count as a death");
         Registry::clear();
         server::RoomStorage::clear();
         server::ClientStorage::clear();

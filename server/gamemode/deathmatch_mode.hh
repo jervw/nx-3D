@@ -3,18 +3,25 @@
 
 #include <server/gamemode/game_mode.hh>
 
+#include <mutex>
+#include <unordered_map>
+
 namespace nx3d::server::gamemode
 {
 
 /// Classic deathmatch.
 ///
-/// The victim's health is reset and they are instantly respawned by whoever
-/// killed them. This is the original free-for-all behaviour of the game.
+/// Players respawn after a short death screen.
 class DeathmatchMode : public GameMode
 {
 public:
     nx3d::GameMode type() const override;
     void onPlayerDeath(nexilis::server::Room& room, uint64_t killerId, uint64_t victimId) override;
+    void update(nexilis::server::Room& room, float dt) override;
+
+private:
+    std::mutex m_respawnMutex;
+    std::unordered_map<uint64_t, float> m_respawnTimers;
 };
 
 } // namespace nx3d::server::gamemode
