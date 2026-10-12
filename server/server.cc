@@ -13,6 +13,7 @@
 #include <nexilis/server/runtime.hh>
 #include <nexilis/server/server_config.hh>
 
+#include <nexilis/server/signal.hh>
 #include <server/gamemode/game_mode_registry.hh>
 #include <server/gun/gun_manager.hh>
 
@@ -20,7 +21,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <csignal>
 #include <functional>
 #include <iostream>
 #include <pthread.h>
@@ -39,19 +39,10 @@ nexilis::server::Room createRoom(const std::string& name)
 
 int main()
 {
-    sigset_t shutdownSignals;
-    sigemptyset(&shutdownSignals);
-    sigaddset(&shutdownSignals, SIGINT);
-    sigaddset(&shutdownSignals, SIGTERM);
-    if (pthread_sigmask(SIG_BLOCK, &shutdownSignals, nullptr) != 0)
-    {
-        std::cerr << "Failed to block shutdown signals" << std::endl;
-        return 1;
-    }
-
     nexilis::Log::startConsoleLogging(nexilis::logger::LogLevel::Info);
 
     using namespace nexilis::server;
+    SignalHandler signal_handler;
 
     ServerConfig server_config;
     server_config.setMode(AuthenticationMode::password_protected);
@@ -118,11 +109,8 @@ int main()
 
     std::cout << "Nx3D game server is running. Waiting for SIGINT or SIGTERM..."
               << std::endl;
-    int shutdownSignal = 0;
-    const int signalError = sigwait(&shutdownSignals, &shutdownSignal);
-    if (signalError != 0)
-        std::cerr << "Failed to wait for shutdown signal: " << signalError << std::endl;
+
+    signal_handler.waitForShutdown();
     running.store(false);
     server_runtime.join();
-    return signalError == 0 ? 0 : 1;
 }
