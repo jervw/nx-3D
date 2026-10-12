@@ -170,6 +170,21 @@ cd "$PWD/repo/client"
               make install
               mkdir -p "$out/include"
               cp -a "$NEXILIS_SOURCE_ROOT/include/." "$out/include/"
+
+              # `make install` ships libboost_json but not the vendored Boost
+              # libraries it links against (e.g. libboost_container).
+              for lib in $(find . -name 'libboost_*.so*'); do
+                [ -e "$out/lib/$(basename "$lib")" ] || cp -a "$lib" "$out/lib/"
+              done
+
+              # The installed package config records absolute paths of the
+              # vendored Boost headers inside the (temporary) build tree. Ship
+              # those headers in $out/include and point the config there.
+              for inc in "$NEXILIS_SOURCE_ROOT"/third-party/boost/libs/*/include; do
+                [ -d "$inc" ] && cp -a --no-preserve=mode "$inc/." "$out/include/"
+              done
+              sed -i "s|^set(NEXILIS_BOOST_INCLUDE_DIRS .*|set(NEXILIS_BOOST_INCLUDE_DIRS \"$out/include\")|" \
+                "$out"/lib*/cmake/Nexilis/NexilisConfig.cmake
               runHook postInstall
             '';
           };
