@@ -232,6 +232,10 @@ cd "$PWD/repo/client"
             packages = [ pkgs.git pkgs.gdb pkgs.cmake pkgs.ninja ];
 
             shellHook = ''
+              # A host-wide LD_LIBRARY_PATH (e.g. from NixOS audio/GPU setups)
+              # can leak libraries built against a different glibc into the
+              # link step ("undefined reference to sqrtf@GLIBC_2.43").
+              unset LD_LIBRARY_PATH
               echo "nx-3D development shell"
               echo "  build server: cmake -S server -B server/build && cmake --build server/build"
               echo "  build client: cmake -S client -B client/build && cmake --build client/build"
