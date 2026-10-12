@@ -193,6 +193,7 @@ cd "$PWD/repo/client"
           nexilis = nexilisPkg;
           server = mkServer pkgs nexilisPkg;
           client = mkClient pkgs nexilisPkg;
+          default = mkClient pkgs nexilisPkg;
         });
 
       apps = forAllSystems (system:
@@ -203,7 +204,17 @@ cd "$PWD/repo/client"
         in
         {
           server = { type = "app"; program = "${server}/bin/nx-3D-server"; };
-          client = { type = "app"; program = "${client}/bin/nx_3D_client"; };
+          # The client is fully RPATH-linked, so a host-wide LD_LIBRARY_PATH
+          # only risks mixing in libraries built against another glibc.
+          client = {
+            type = "app";
+            program = "${pkgs.writeShellScript "nx-3D-client" ''
+              unset LD_LIBRARY_PATH
+              exec ${client}/bin/nx_3D_client "$@"
+            ''}";
+          };
+          # `nix run` with no attribute launches the client.
+          default = self.apps.${system}.client;
         });
 
       devShells = forAllSystems (system:
