@@ -7,19 +7,18 @@
     # Third-party game engine (Vulkan renderer, physics, audio, UI).
     # Not a flake itself, so it is used as a plain source tree.
     spear = {
-      url = "github:NeuronActivation/spear";
+      url = "github:NeuronActivation/spear/93f12df7b355804489790541307036fbb0742de2";
       flake = false;
     };
 
-    # Networking library. The upstream repo (`Nexilislib/nexilis`) is private
-    # and is fetched over SSH on purpose (matches the .gitmodules URL), and it
-    # has no flake.nix of its own. If you already have the submodule checked
-    # out locally you can instead use:
+    # Networking library. It vendors Boost as git submodules (the Nix build of
+    # nexilis forces that mode), so fetch it over HTTPS with submodules. It has
+    # no flake.nix of its own. To use a local checkout instead:
     #
     #   nix flake lock --override-input nexilis path:./nexilis
     #
     nexilis = {
-      url = "git+ssh://git@github.com/Nexilislib/nexilis.git";
+      url = "git+https://github.com/nexilistudios/nexilis?submodules=1&rev=5c8a5a5e7dce5c1ad7a351886e9fc0c02c4bb193";
       flake = false;
     };
   };
@@ -171,6 +170,21 @@ cd "$PWD/repo/client"
               make install
               mkdir -p "$out/include"
               cp -a "$NEXILIS_SOURCE_ROOT/include/." "$out/include/"
+
+              # `make install` ships libboost_json but not the vendored Boost
+              # libraries it links against (e.g. libboost_container).
+              for lib in $(find . -name 'libboost_*.so*'); do
+                [ -e "$out/lib/$(basename "$lib")" ] || cp -a "$lib" "$out/lib/"
+              done
+
+              # The installed package config records absolute paths of the
+              # vendored Boost headers inside the (temporary) build tree. Ship
+              # those headers in $out/include and point the config there.
+              for inc in "$NEXILIS_SOURCE_ROOT"/third-party/boost/libs/*/include; do
+                [ -d "$inc" ] && cp -a --no-preserve=mode "$inc/." "$out/include/"
+              done
+              sed -i "s|^set(NEXILIS_BOOST_INCLUDE_DIRS .*|set(NEXILIS_BOOST_INCLUDE_DIRS \"$out/include\")|" \
+                "$out"/lib*/cmake/Nexilis/NexilisConfig.cmake
               runHook postInstall
             '';
           };
@@ -179,6 +193,7 @@ cd "$PWD/repo/client"
           nexilis = nexilisPkg;
           server = mkServer pkgs nexilisPkg;
           client = mkClient pkgs nexilisPkg;
+          default = mkClient pkgs nexilisPkg;
         });
 
       apps = forAllSystems (system:
@@ -189,7 +204,17 @@ cd "$PWD/repo/client"
         in
         {
           server = { type = "app"; program = "${server}/bin/nx-3D-server"; };
-          client = { type = "app"; program = "${client}/bin/nx_3D_client"; };
+          # The client is fully RPATH-linked, so a host-wide LD_LIBRARY_PATH
+          # only risks mixing in libraries built against another glibc.
+          client = {
+            type = "app";
+            program = "${pkgs.writeShellScript "nx-3D-client" ''
+              unset LD_LIBRARY_PATH
+              exec ${client}/bin/nx_3D_client "$@"
+            ''}";
+          };
+          # `nix run` with no attribute launches the client.
+          default = self.apps.${system}.client;
         });
 
       devShells = forAllSystems (system:
@@ -207,6 +232,10 @@ cd "$PWD/repo/client"
             packages = [ pkgs.git pkgs.gdb pkgs.cmake pkgs.ninja ];
 
             shellHook = ''
+              # A host-wide LD_LIBRARY_PATH (e.g. from NixOS audio/GPU setups)
+              # can leak libraries built against a different glibc into the
+              # link step ("undefined reference to sqrtf@GLIBC_2.43").
+              unset LD_LIBRARY_PATH
               echo "nx-3D development shell"
               echo "  build server: cmake -S server -B server/build && cmake --build server/build"
               echo "  build client: cmake -S client -B client/build && cmake --build client/build"

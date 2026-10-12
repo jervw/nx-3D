@@ -3,17 +3,20 @@
     "nexilis": {
       "flake": false,
       "locked": {
-        "lastModified": 1789322317,
-        "narHash": "sha256-MoxDHxK2399wz8RMtm/NErW+DLq84jNWK1OWuDGxY7I=",
+        "lastModified": 1791818077,
+        "narHash": "sha256-ddrR0In8fpR0x+AE0jlItLUMHhSPpVn7QCbc0X4S3PY=",
         "ref": "refs/heads/main",
-        "rev": "90389f234668308c3d8e1d926e838f31f28b054e",
-        "revCount": 771,
+        "rev": "5c8a5a5e7dce5c1ad7a351886e9fc0c02c4bb193",
+        "revCount": 817,
+        "submodules": true,
         "type": "git",
-        "url": "ssh://git@github.com/Nexilislib/nexilis.git"
+        "url": "https://github.com/nexilistudios/nexilis"
       },
       "original": {
+        "rev": "5c8a5a5e7dce5c1ad7a351886e9fc0c02c4bb193",
+        "submodules": true,
         "type": "git",
-        "url": "ssh://git@github.com/Nexilislib/nexilis.git"
+        "url": "https://github.com/nexilistudios/nexilis"
       }
     },
     "nixpkgs": {
@@ -42,16 +45,17 @@
     "spear": {
       "flake": false,
       "locked": {
-        "lastModified": 1789240241,
-        "narHash": "sha256-TVFMBDMISHQ65oPfLNQCEN9dAEWzzQZaBcl0kW+iRDk=",
+        "lastModified": 1791817833,
+        "narHash": "sha256-ohLo9WuxpFLpYi+CQjIxYaRR/2SlLOmT1gGDZQu0jU8=",
         "owner": "NeuronActivation",
         "repo": "spear",
-        "rev": "7127b0752732a270446e5798cdc691ea7dcb27eb",
+        "rev": "93f12df7b355804489790541307036fbb0742de2",
         "type": "github"
       },
       "original": {
         "owner": "NeuronActivation",
         "repo": "spear",
+        "rev": "93f12df7b355804489790541307036fbb0742de2",
         "type": "github"
       }
     }

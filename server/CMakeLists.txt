@@ -16,7 +16,7 @@ find_package(Boost REQUIRED COMPONENTS json)
 # under a build/ folder is excluded.
 file(GLOB_RECURSE NX3D_SERVER_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
-list(FILTER NX3D_SERVER_SOURCES EXCLUDE REGEX "/build/")
+list(FILTER NX3D_SERVER_SOURCES EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/build/")
 
 add_executable(nx-3D-server ${NX3D_SERVER_SOURCES})
 target_include_directories(nx-3D-server PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
