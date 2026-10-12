@@ -40,26 +40,34 @@ int main()
         room->joinRoom(id);
         room->setPlayerTeam(id, team);
     };
+    auto bomb = [](const std::vector<std::unique_ptr<client::ClientAPI::MatchEvent>>& events)
+            -> const client::ClientAPI::BombMatchEvent&
+    {
+        check(!events.empty() && events.back() &&
+                      events.back()->kind() == client::ClientAPI::MatchEvent::Kind::bomb,
+              "Missing bomb match event");
+        return static_cast<const client::ClientAPI::BombMatchEvent&>(*events.back());
+    };
     add(10, t, "Terrorist");
     add(20, ct, "Counter Terrorist");
     GameModeRegistry::update(1.0f);
     check(room->canDamage(10, 20), "Round failed to start");
     auto first = t.consumeMatchEvents();
-    check(!first.empty() && first.back().round == 1 && first.back().alive, "Bad first round state");
+    check(bomb(first).round == 1 && bomb(first).alive, "Bad first round state");
 
     add(30, queued, "Terrorist");
     check(!room->canDamage(30, 20), "Queued player could shoot");
     auto queueEvents = queued.consumeMatchEvents();
-    check(!queueEvents.empty() && queueEvents.back().queue_position == 1, "Queue position missing");
+    check(bomb(queueEvents).queue_position == 1, "Queue position missing");
 
     check(room->onPlayerAction(10, 1), "Plant rejected");
     GameModeRegistry::update(3.1f);
     auto planted = t.consumeMatchEvents();
-    check(!planted.empty() && planted.back().bomb_planted, "Bomb did not plant");
+    check(bomb(planted).bomb_planted, "Bomb did not plant");
     check(room->onPlayerAction(20, 2), "Defuse rejected");
     GameModeRegistry::update(5.1f);
     auto defused = ct.consumeMatchEvents();
-    check(!defused.empty() && defused.back().counter_terrorist_score == 1,
+    check(bomb(defused).counter_terrorist_score == 1,
           "Defuse did not score");
 
     GameModeRegistry::update(5.1f);
@@ -67,7 +75,7 @@ int main()
     check(room->damagePlayer(20, 100.0f), "Kill did not lower health");
     room->onPlayerDied(10, 20);
     auto eliminated = t.consumeMatchEvents();
-    check(!eliminated.empty() && eliminated.back().terrorist_score == 1,
+    check(bomb(eliminated).terrorist_score == 1,
           "Elimination did not score");
     check(!room->canDamage(10, 20), "Post-round shooting allowed");
 
@@ -83,8 +91,8 @@ int main()
                   room->getPlayerTeam(20) == "Terrorist",
           "Halftime did not swap sides");
     auto secondHalf = ct.consumeMatchEvents();
-    check(!secondHalf.empty() && secondHalf.back().round == 13 &&
-                  secondHalf.back().counter_terrorist_score == 11,
+    check(bomb(secondHalf).round == 13 &&
+                  bomb(secondHalf).counter_terrorist_score == 11,
           "Half-time score was not carried to new sides");
     check(!room->canSelectTeam(10), "Active player could switch team");
 
@@ -92,7 +100,7 @@ int main()
     GameModeRegistry::update(3.1f);
     GameModeRegistry::update(40.1f);
     auto exploded = t.consumeMatchEvents();
-    check(!exploded.empty() && exploded.back().terrorist_score == 2,
+    check(bomb(exploded).terrorist_score == 2,
           "Explosion did not score");
 
     GameModeRegistry::clear();

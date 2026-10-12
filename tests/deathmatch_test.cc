@@ -17,7 +17,7 @@ void require(bool condition, const char* message)
         throw std::runtime_error(message);
 }
 
-class TestProtocol : public nexilis::Protocol
+class TestProtocol : public nexilis::NXProtocol
 {
 public:
     void start() override
@@ -26,9 +26,9 @@ public:
     void stop() override
     {
     }
-    Type getType() override
+    NXProtocol::Type getType() override
     {
-        return Type::BOOST_TCP_SERVER;
+        return NXProtocol::Type::BOOST_TCP_SERVER;
     }
 };
 } // namespace
