@@ -7,19 +7,18 @@
     # Third-party game engine (Vulkan renderer, physics, audio, UI).
     # Not a flake itself, so it is used as a plain source tree.
     spear = {
-      url = "github:NeuronActivation/spear";
+      url = "github:NeuronActivation/spear/93f12df7b355804489790541307036fbb0742de2";
       flake = false;
     };
 
-    # Networking library. The upstream repo (`Nexilislib/nexilis`) is private
-    # and is fetched over SSH on purpose (matches the .gitmodules URL), and it
-    # has no flake.nix of its own. If you already have the submodule checked
-    # out locally you can instead use:
+    # Networking library. It vendors Boost as git submodules (the Nix build of
+    # nexilis forces that mode), so fetch it over HTTPS with submodules. It has
+    # no flake.nix of its own. To use a local checkout instead:
     #
     #   nix flake lock --override-input nexilis path:./nexilis
     #
     nexilis = {
-      url = "git+ssh://git@github.com/Nexilislib/nexilis.git";
+      url = "git+https://github.com/nexilistudios/nexilis?submodules=1&rev=5c8a5a5e7dce5c1ad7a351886e9fc0c02c4bb193";
       flake = false;
     };
   };
