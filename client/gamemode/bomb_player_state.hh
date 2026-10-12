@@ -13,6 +13,12 @@ constexpr bool shouldShowEliminated(uint64_t round, bool active, bool alive)
     return round > 0 && active && !alive;
 }
 
+constexpr bool isBombPlayerEliminated(uint64_t round, bool active, bool alive,
+                                      bool healthDepleted)
+{
+    return active && (healthDepleted || shouldShowEliminated(round, active, alive));
+}
+
 } // namespace nx3d::client::gamemode
 
 #endif

@@ -81,7 +81,7 @@ int main()
             }
             require(room->getPlayerHealth(20) == 0.0f, "Victim did not stay dead");
             require(victim.consumeRespawnEvents().empty(), "Victim respawned too early");
-            Registry::update(2.4f);
+            Registry::update(1.9f);
             require(room->getPlayerHealth(20) == 0.0f, "Respawn delay was too short");
             Registry::update(0.2f);
             require(room->getPlayerHealth(20) == 100.0f, "Victim was not revived");
@@ -111,7 +111,7 @@ int main()
         require(room->getPlayerKills(10) == 100, "Falling credited another player with a kill");
         require(victim.consumeDamageEvents().size() == 1, "Falling did not send damage");
         require(victim.consumeRespawnEvents().empty(), "Falling respawned too early");
-        Registry::update(2.6f);
+        Registry::update(2.1f);
         require(victim.consumeRespawnEvents().size() == 1, "Falling did not respawn the victim");
 
         Registry::update(1.0f / 60.0f);

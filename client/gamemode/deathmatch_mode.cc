@@ -88,10 +88,6 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
         m_hitmarkerFrames--;
         app.ui->hitmarkerText.setString(m_hitmarkerFrames > 0 ? "X" : "");
     }
-    const std::string deathText = m_health <= 0 ? "WASTED" : "";
-    if (app.ui->wastedText.getString() != deathText)
-        app.ui->wastedText.setString(deathText);
-
     // Play the hitmarker sound shortly after a hit (handled in the shared
     // GameMode base so it works in every gamemode).
     updateHitmarkerSound(app);
@@ -176,7 +172,10 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
                 m_health = 0;
             app.ui->healthText.setString("HP: " + std::to_string(m_health));
             if (m_health == 0)
+            {
                 m_triggerHeld = false;
+                app.movement_controller.resetVerticalMotion();
+            }
             app.camera.addRecoilOffset(m_health == 0 ? -7.0f : -1.5f, 0.0f);
         }
         else if (evt.shooter_id == app.client_api.getClientId() && evt.damage > 0.0f)
@@ -436,6 +435,8 @@ void DeathmatchMode::equipGun(ClientApp& app,
         auto ctx = spear::ui::RenderContext{spear::rendering::vulkan::g_frameContext.commandBuffer};
         if (app.currentState == ClientApp::State::Paused)
             app.ui->renderPauseOverlay(ctx, app.quitHovered);
+        else if (app.game_mode && app.game_mode->isEliminated())
+            app.ui->renderDeathOverlay(ctx);
         if (app.ui->isLeaderboardVisible())
             app.ui->renderLeaderboardOverlay(ctx);
         app.ui->renderChatOverlay(ctx);

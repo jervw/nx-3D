@@ -70,7 +70,9 @@ int main()
     check(bomb(defused).counter_terrorist_score == 1,
           "Defuse did not score");
 
-    GameModeRegistry::update(5.1f);
+    GameModeRegistry::update(3.9f);
+    check(!room->canDamage(30, 20), "Next round began too early");
+    GameModeRegistry::update(0.2f);
     check(room->canDamage(30, 20), "Queued player not admitted next round");
     check(room->damagePlayer(20, 100.0f), "Kill did not lower health");
     room->onPlayerDied(10, 20);
@@ -82,11 +84,11 @@ int main()
     // Finish the first half, then verify the MR12 side swap and score mapping.
     for (int round = 3; round <= 12; ++round)
     {
-        GameModeRegistry::update(5.1f);
+        GameModeRegistry::update(4.1f);
         check(room->damagePlayer(20, 100.0f), "Round victim was not revived");
         room->onPlayerDied(10, 20);
     }
-    GameModeRegistry::update(5.1f);
+    GameModeRegistry::update(4.1f);
     check(room->getPlayerTeam(10) == "Counter Terrorist" &&
                   room->getPlayerTeam(20) == "Terrorist",
           "Halftime did not swap sides");

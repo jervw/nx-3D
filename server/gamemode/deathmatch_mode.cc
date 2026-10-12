@@ -26,7 +26,7 @@ void DeathmatchMode::onPlayerDeath(nexilis::server::Room& room, uint64_t killerI
     room.recordKill(killerId, victimId);
     {
         std::lock_guard lock(m_respawnMutex);
-        m_respawnTimers[victimId] = 2.5f;
+        m_respawnTimers[victimId] = 2.0f;
     }
 
     auto* sender = nexilis::server::ClientStorage::getClientById(

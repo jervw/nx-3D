@@ -156,7 +156,9 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
                                   { cleanQuit(); });
 
     eventHandler.registerCallback(SDL_EVENT_MOUSE_MOTION, [this](const SDL_Event& event)
-                                  { camera.rotate(event.motion.xrel, event.motion.yrel); });
+                                  {
+                                      if (currentState == State::Game && game_mode && game_mode->canMove())
+                                          camera.rotate(event.motion.xrel, event.motion.yrel); });
 
     eventHandler.registerCallback(SDL_EVENT_MOUSE_BUTTON_DOWN,
                                   [this](const SDL_Event& event)
@@ -797,7 +799,9 @@ void ClientApp::run()
         }
         else
         {
-            eventHandler.handleEvents(movement_controller, delta_time);
+            const bool canMove = currentState != State::Game ||
+                                 (game_mode && game_mode->canMove());
+            eventHandler.handleEvents(movement_controller, delta_time, canMove);
         }
 
         // --- Render ---
@@ -818,7 +822,12 @@ void ClientApp::run()
                     camera.getPosition(), camera.getFront(), camera.getWorldUp());
 
             if (game_mode)
+            {
                 game_mode->update(*this, delta_time);
+                const std::string deathText = game_mode->isEliminated() ? "WASTED" : "";
+                if (ui->wastedText.getString() != deathText)
+                    ui->wastedText.setString(deathText);
+            }
 
             if (ready && client_api.clientInRoom())
             {

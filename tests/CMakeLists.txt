@@ -23,6 +23,10 @@ target_include_directories(bomb_mode_test PRIVATE ..)
 target_link_libraries(bomb_mode_test PRIVATE Nexilis::nexilis Boost::json)
 add_test(NAME bomb_mode COMMAND bomb_mode_test)
 
+add_executable(bomb_player_state_test bomb_player_state_test.cc)
+target_include_directories(bomb_player_state_test PRIVATE ..)
+add_test(NAME bomb_player_state COMMAND bomb_player_state_test)
+
 find_package(glm REQUIRED)
 add_executable(weapon_motion_test weapon_motion_test.cc)
 target_include_directories(weapon_motion_test PRIVATE ..)

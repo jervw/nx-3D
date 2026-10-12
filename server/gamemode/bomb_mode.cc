@@ -20,7 +20,7 @@ constexpr float kRoundSeconds = 115.0f;
 constexpr float kBombSeconds = 40.0f;
 constexpr float kPlantSeconds = 3.0f;
 constexpr float kDefuseSeconds = 5.0f;
-constexpr float kBetweenSeconds = 5.0f;
+constexpr float kBetweenSeconds = 4.0f;
 constexpr float kDefuseRange = 120.0f;
 } // namespace
 

@@ -28,6 +28,14 @@ public:
     std::string playerTeam(uint64_t playerId) const override;
     void onEnter(ClientApp& app, const std::string& team) override;
     void update(ClientApp& app, float delta_time) override;
+    bool canMove() const override
+    {
+        return m_health > 0;
+    }
+    bool isEliminated() const override
+    {
+        return m_health <= 0;
+    }
     void handleMouseButtonDown(ClientApp& app, const SDL_Event& event) override;
     void handleMouseButtonUp(ClientApp& app, const SDL_Event& event) override;
     void handleKeyDown(ClientApp& app, const SDL_Event& event) override;

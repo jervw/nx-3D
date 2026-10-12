@@ -14,6 +14,8 @@ public:
     }
     void onEnter(ClientApp& app, const std::string& team) override;
     void update(ClientApp& app, float deltaTime) override;
+    bool canMove() const override;
+    bool isEliminated() const override;
     void handleMouseButtonDown(ClientApp& app, const SDL_Event& event) override;
     void handleKeyDown(ClientApp& app, const SDL_Event& event) override;
     void handleKeyUp(ClientApp& app, const SDL_Event& event) override;

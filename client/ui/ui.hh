@@ -69,6 +69,7 @@ public:
     /// Render the pause menu overlay (quads only; used from the overlay
     /// callback that also draws the crosshair).
     void renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered);
+    void renderDeathOverlay(spear::ui::RenderContext ctx);
 
     /// Show the Tab leaderboard with the given entries. Terrorists are shown
     /// on the left, Counter Terrorists on the right.
@@ -150,6 +151,7 @@ public:
 
 private:
     void buildPauseMenu();
+    void buildDeathOverlay();
     void buildLeaderboard();
     void buildChat();
     void setRowText(spear::ui::vulkan::Text& text, const LeaderboardEntry& entry);
@@ -165,6 +167,8 @@ private:
     spear::ui::vulkan::UIRenderer m_renderer;
 
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseBackdropQuad;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_deathBackdropQuad;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_deathBandQuad;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pausePanelBorder;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pausePanel;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderTrack;

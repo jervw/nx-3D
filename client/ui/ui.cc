@@ -172,7 +172,7 @@ Ui::Ui(VkDevice device,
     hitmarkerText.setScale(0.003f);
 
     wastedText.setString("");
-    wastedText.setColor(SDL_Color{210, 35, 35, 255});
+    wastedText.setColor(SDL_Color{255, 70, 70, 255});
     wastedText.setPosition(glm::vec2(-0.27f, 0.0f));
 
     teamDisplayText.setString("");
@@ -206,6 +206,39 @@ Ui::Ui(VkDevice device,
     pauseInstructions.setPosition(glm::vec2(-0.37f, -0.56f));
 
     buildPauseMenu();
+    buildDeathOverlay();
+}
+
+void Ui::buildDeathOverlay()
+{
+    auto makeSolidTexture = [&](unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+    {
+        auto texture = std::make_shared<spear::rendering::vulkan::STBTexture>(
+                m_device, m_physDevice, m_commandPool, m_graphicsQueue);
+        unsigned char pixel[4] = {r, g, b, a};
+        texture->loadFromRGBA(pixel, 1, 1);
+        return texture;
+    };
+
+    m_deathBackdropQuad = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(45, 0, 0, 220));
+    m_deathBackdropQuad->setPosition(glm::vec2(-1.0f, -1.0f));
+    m_deathBackdropQuad->setSize(glm::vec2(2.0f, 2.0f));
+
+    m_deathBandQuad = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(0, 0, 0, 230));
+    m_deathBandQuad->setPosition(glm::vec2(-1.0f, -0.16f));
+    m_deathBandQuad->setSize(glm::vec2(2.0f, 0.32f));
+}
+
+void Ui::renderDeathOverlay(spear::ui::RenderContext ctx)
+{
+    if (m_deathBackdropQuad)
+        m_deathBackdropQuad->render(ctx);
+    if (m_deathBandQuad)
+        m_deathBandQuad->render(ctx);
 }
 
 void Ui::buildPauseMenu()

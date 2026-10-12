@@ -1,6 +1,7 @@
 #include <client/gamemode/bomb_mode.hh>
 
 #include <client/app/client_app.hh>
+#include <client/gamemode/bomb_player_state.hh>
 
 #include <nexilis/client/packet.hh>
 
@@ -10,6 +11,17 @@
 namespace nx3d::client::gamemode
 {
 namespace blt = spear::physics::bullet;
+
+bool BombMode::canMove() const
+{
+    return !isEliminated();
+}
+
+bool BombMode::isEliminated() const
+{
+    return isBombPlayerEliminated(m_round, m_active, m_alive,
+                                  DeathmatchMode::isEliminated());
+}
 
 void BombMode::onEnter(ClientApp& app, const std::string& team)
 {

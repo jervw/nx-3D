@@ -43,6 +43,12 @@ public:
     /// Called every frame while the app is in the Game state.
     virtual void update(ClientApp& app, float delta_time) = 0;
 
+    /// Whether the local player may move or turn the camera this frame.
+    virtual bool canMove() const = 0;
+
+    /// Whether to show the local death screen.
+    virtual bool isEliminated() const = 0;
+
     /// Called for mouse button presses while the app is in the Game state.
     virtual void handleMouseButtonDown(ClientApp& app, const SDL_Event& event) = 0;
 
