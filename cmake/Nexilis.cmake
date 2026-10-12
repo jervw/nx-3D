@@ -25,4 +25,12 @@ else()
         unset(BUILD_TESTING)
     endif()
     add_library(Nexilis::nexilis ALIAS nexilis)
+
+    # Header-only Boost libs such as asio are not pulled in by boost_json's dependencies.
+    if(NEXILIS_BOOST_INCLUDE_DIRS)
+        # Boost.Numeric nests its headers one level deeper (libs/numeric/<lib>/include).
+        file(GLOB _nx3d_boost_numeric_includes "${_nx3d_nexilis_source}/third-party/boost/libs/numeric/*/include")
+        target_include_directories(nexilis SYSTEM PUBLIC
+            "$<BUILD_INTERFACE:${NEXILIS_BOOST_INCLUDE_DIRS};${_nx3d_boost_numeric_includes}>")
+    endif()
 endif()

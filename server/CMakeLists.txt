@@ -7,7 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../nexilis/nexilis/build")
 include(../cmake/Nexilis.cmake)
-find_package(Boost REQUIRED COMPONENTS json)
+
+if (NOT NEXILIS_USE_SUBMODULES)
+    find_package(Boost REQUIRED COMPONENTS json)
+endif()
 
 # Collect all sources by globbing recursively so new files are picked up
 # automatically. CONFIGURE_DEPENDS makes CMake re-run the configure step
@@ -21,3 +24,7 @@ list(FILTER NX3D_SERVER_SOURCES EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/buil
 add_executable(nx-3D-server ${NX3D_SERVER_SOURCES})
 target_include_directories(nx-3D-server PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(nx-3D-server PRIVATE Nexilis::nexilis Boost::json)
+
+if(WIN32)
+    target_link_libraries(nx-3D-server PRIVATE ws2_32 mswsock)
+endif()

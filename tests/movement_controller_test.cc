@@ -1,10 +1,13 @@
 #include <spear/camera.hh>
 #include <spear/movement_controller.hh>
+#include <spear/model/obj_loader.hh>
 
 #include <btBulletDynamicsCommon.h>
 
+#include <array>
 #include <cmath>
 #include <iostream>
+#include <string>
 #include <unordered_map>
 
 int main()
@@ -115,6 +118,85 @@ int main()
     {
         std::cerr << "Jump was snapped back to the ground\n";
         return 1;
+    }
+
+    // Walking uphill must follow a walkable slope instead of losing ground
+    // contact and falling through the terrain.
+    const btVector3 slopeNormal(-0.342020f, 0.939693f, 0.0f);
+    btStaticPlaneShape slopeShape(slopeNormal, slopeNormal.dot(btVector3(200.0f, 0.0f, 200.0f)));
+    btRigidBody::btRigidBodyConstructionInfo slopeInfo(0.0f, nullptr, &slopeShape);
+    btRigidBody slope(slopeInfo);
+    world.addRigidBody(&slope);
+
+    spear::Camera slopeCamera(glm::vec3(200.0f, 64.0f, 200.0f),
+                              glm::vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.0f, 250.0f);
+    spear::MovementController slopeMovement(slopeCamera, &world, 64.0f);
+    for (int frame = 0; frame < 20; ++frame)
+        slopeMovement.processInput(walking, 0.016f);
+    if (slopeCamera.getPosition().x < 270.0f ||
+        slopeCamera.getPosition().y < 85.0f || !slopeMovement.isOnGround())
+    {
+        std::cerr << "Player did not walk uphill: x=" << slopeCamera.getPosition().x
+                  << " y=" << slopeCamera.getPosition().y
+                  << " grounded=" << slopeMovement.isOnGround() << '\n';
+        return 1;
+    }
+
+    auto downhill = keys;
+    downhill[SDLK_S] = true;
+    for (int frame = 0; frame < 20; ++frame)
+        slopeMovement.processInput(downhill, 0.016f);
+    if (slopeCamera.getPosition().x > 210.0f ||
+        std::abs(slopeCamera.getPosition().y - 64.0f) > 4.0f ||
+        !slopeMovement.isOnGround())
+    {
+        std::cerr << "Player did not follow terrain downhill: x="
+                  << slopeCamera.getPosition().x << " y=" << slopeCamera.getPosition().y
+                  << " grounded=" << slopeMovement.isOnGround() << '\n';
+        return 1;
+    }
+
+    spear::OBJLoader mapLoader;
+    if (!mapLoader.load(std::string(PROJECT_ROOT) + "/assets/de_dust2/source/de_dust2.obj", "", false))
+    {
+        std::cerr << "Could not load map collision geometry\n";
+        return 1;
+    }
+    btTriangleMesh mapMesh;
+    const auto& vertices = mapLoader.getVertices();
+    for (const auto& faces : mapLoader.getFacesByMaterial())
+        for (const auto& face : faces)
+        {
+            const auto& a = vertices[face.vertexIndices[0]];
+            const auto& b = vertices[face.vertexIndices[1]];
+            const auto& c = vertices[face.vertexIndices[2]];
+            mapMesh.addTriangle({a.x, a.z, -a.y}, {b.x, b.z, -b.y}, {c.x, c.z, -c.y});
+        }
+    btBvhTriangleMeshShape mapShape(&mapMesh, true);
+    btRigidBody::btRigidBodyConstructionInfo mapInfo(0.0f, nullptr, &mapShape);
+    btRigidBody mapBody(mapInfo);
+    btDbvtBroadphase mapBroadphase;
+    btDiscreteDynamicsWorld mapWorld(&dispatcher, &mapBroadphase, &solver, &config);
+    mapWorld.addRigidBody(&mapBody);
+    const std::array<glm::vec3, 10> spawns{{
+            {355.0f, -48.0f, -2364.0f}, {178.0f, -48.0f, -2408.0f},
+            {381.0f, -48.0f, -2470.0f}, {180.0f, -48.0f, -2368.0f},
+            {123.0f, -48.0f, -2519.0f}, {-592.0f, 192.0f, 764.0f},
+            {-834.0f, 192.0f, 797.0f}, {-561.0f, 192.0f, 771.0f},
+            {-801.0f, 192.0f, 777.0f}, {-705.0f, 204.0f, 947.0f}}};
+    for (const auto& spawn : spawns)
+    {
+        spear::Camera spawnCamera(spawn);
+        spear::MovementController spawnMovement(spawnCamera, &mapWorld, 64.0f);
+        spawnMovement.resetVerticalMotion();
+        for (int frame = 0; frame < 180; ++frame)
+            spawnMovement.processInput(keys, 1.0f / 60.0f);
+        if (!spawnMovement.isOnGround() || spawnCamera.getPosition().y < -256.0f)
+        {
+            std::cerr << "Spawn fell through map: x=" << spawn.x << " z=" << spawn.z
+                      << " y=" << spawnCamera.getPosition().y << '\n';
+            return 1;
+        }
     }
     return 0;
 }

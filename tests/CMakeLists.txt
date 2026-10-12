@@ -40,6 +40,7 @@ add_test(NAME player_hit COMMAND player_hit_test)
 
 if(TARGET spear)
     add_executable(movement_controller_test movement_controller_test.cc)
+    target_compile_definitions(movement_controller_test PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
     target_link_libraries(movement_controller_test PRIVATE spear)
     add_test(NAME movement_controller COMMAND movement_controller_test)
 

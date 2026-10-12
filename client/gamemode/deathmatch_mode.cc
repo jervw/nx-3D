@@ -43,10 +43,6 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
     m_team = team;
     app.ui->teamDisplayText.setString(m_team);
 
-    // Tell the server which team this player joined so it can track kills and
-    // deaths per team. The server replies with a stats seed that the client
-    // merges into its locally-maintained leaderboard.
-    app.tcp_client.sendMessage(packet::Room::Player3D::setTeam(app.client_api, team));
     app.ui->hideLeaderboard();
     m_leaderboard.clear();
 
@@ -57,6 +53,18 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
         app.camera.setPosition(pickSpawnPoint());
         app.movement_controller.resetVerticalMotion();
     }
+
+    // A previous fall can leave the server's stored position below the map.
+    // Send the new spawn over TCP before selecting a team, because selecting
+    // a team makes the player eligible for the server's fall-death check.
+    const glm::vec3 spawn = app.camera.getPosition();
+    const glm::vec3 forward = app.camera.getFront();
+    const float yaw = std::atan2(-forward.x, -forward.z);
+    app.tcp_client.sendMessage(packet::Room::Player3D::position(
+            app.client_api, nexilis::Vector3f({spawn.x, spawn.y, spawn.z}), yaw));
+
+    // The server replies with a stats seed for the local leaderboard.
+    app.tcp_client.sendMessage(packet::Room::Player3D::setTeam(app.client_api, team));
 
     m_health = 100;
     app.ui->healthText.setString("HP: " + std::to_string(m_health));
