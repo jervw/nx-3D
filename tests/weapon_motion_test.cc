@@ -39,6 +39,18 @@ int main()
             for (int frame = 0; frame < fps; ++frame)
                 motion.update(1.0f / fps, {0.2f, 0.0f, 0.1f}, true);
             require(glm::length(motion.bob) < 0.000001f, "Weapon fails to settle at rest");
+
+            motion.startReload(2.0f);
+            for (int frame = 0; frame < fps; ++frame)
+                motion.update(1.0f / fps, {}, true);
+            require(motion.reload_offset.y < -0.23f && motion.reload_tilt < -17.0f,
+                    "Reload pose does not lower and tilt the gun");
+            for (int frame = 0; frame < fps; ++frame)
+                motion.update(1.0f / fps, {}, true);
+            require(motion.reload_duration == 0.0f &&
+                            glm::length(motion.reload_offset) == 0.0f &&
+                            motion.reload_tilt == 0.0f,
+                    "Reload animation does not settle when reloading finishes");
         }
         WeaponMotion motion;
         motion.update(1.0f / 60.0f, {250.0f, 0.0f, 0.0f}, false);
@@ -46,7 +58,9 @@ int main()
         require(glm::length(motion.bob) == 0.0f, "Airborne motion or teleport causes bob");
         motion.update(std::numeric_limits<float>::quiet_NaN(), {}, true);
         motion.kick(std::numeric_limits<float>::infinity());
+        motion.startReload(std::numeric_limits<float>::quiet_NaN());
         require(std::isfinite(motion.recoil) && std::isfinite(motion.phase), "Invalid input poisons animation");
+        require(motion.reload_duration == 0.0f, "Invalid reload duration starts animation");
         std::cout << "Weapon motion checks passed at 30, 60 and 144 FPS\n";
     }
     catch (const std::exception& error)

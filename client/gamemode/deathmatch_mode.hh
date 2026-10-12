@@ -49,6 +49,7 @@ protected:
     void unequipGun(ClientApp& app);
     void equipWeaponForTeam(ClientApp& app);
     void dropCurrentWeapon(ClientApp& app);
+    void pickupNearbyWeapon(ClientApp& app);
     void fireWeapon(ClientApp& app);
     void startReload(ClientApp& app);
     void refreshWeaponHud(ClientApp& app);
@@ -69,8 +70,6 @@ protected:
     uint64_t m_pickedUpItemId = 0;
     glm::vec3 m_pickedUpItemSize{1.0f};
     std::string m_pickedUpItemType;
-    std::string m_pickedUpItemFilepath;
-    int m_dropCooldown = 0;
     int m_health = 100;
     int m_hitmarkerFrames = 0;
     std::string m_weaponName;

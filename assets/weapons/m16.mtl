@@ -1,0 +1,32 @@
+# Original material palette with 1-pixel diffuse swatches
+newmtl m16_edge
+Ka 0.158 0.162 0.162
+Kd 0.350 0.360 0.360
+map_Kd m16_edge.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl m16_metal
+Ka 0.117 0.122 0.124
+Kd 0.260 0.270 0.275
+map_Kd m16_metal.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl m16_polymer
+Ka 0.088 0.090 0.092
+Kd 0.195 0.200 0.205
+map_Kd m16_polymer.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl m16_shadow
+Ka 0.036 0.038 0.041
+Kd 0.080 0.085 0.090
+map_Kd m16_shadow.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2

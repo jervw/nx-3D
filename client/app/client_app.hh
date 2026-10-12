@@ -19,6 +19,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -100,6 +101,12 @@ public:
     nexilis::TCPClient tcp_client;
     nexilis::UDPClient udp_client;
     std::atomic<bool> ready{false};
+    struct PendingWeaponThrow
+    {
+        glm::vec3 position;
+        glm::vec3 direction;
+    };
+    std::optional<PendingWeaponThrow> pending_weapon_throw;
     glm::vec3 last_sent_position{0.0f};
     float last_sent_yaw = 0.0f;
     float pose_send_elapsed = 1.0f;

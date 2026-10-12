@@ -28,8 +28,8 @@ public:
                    VkDescriptorPool descriptorPool,
                    VkDescriptorSetLayout descriptorSetLayout,
                    spear::physics::bullet::ObjectData&& object_data,
-                   float model_scale = 3.0f,
-                   glm::vec3 model_center = glm::vec3(0.0053f, 0.0156f, -0.0489f));
+                   float model_scale = 0.50f,
+                   glm::vec3 model_center = glm::vec3(0.0f, -0.05f, 0.20f));
 
     void render(spear::Camera& camera) override;
 
@@ -54,14 +54,15 @@ public:
 
     // Call on fire to produce a quick kick.
     void addRecoil(float amount);
+    void startReload(float duration);
 
 private:
-    float m_modelScale = 3.0f;
-    glm::vec3 m_modelCenter{0.0053f, 0.0156f, -0.0489f};
+    float m_modelScale = 0.50f;
+    glm::vec3 m_modelCenter{0.0f, -0.05f, 0.20f};
 
     // View-space offset/rotation
-    glm::vec3 m_viewOffset{0.55f, -0.45f, 2.5f};
-    glm::vec3 m_viewRotation{-8.0f, 25.0f, -8.0f};
+    glm::vec3 m_viewOffset{0.68f, -0.58f, 2.25f};
+    glm::vec3 m_viewRotation{-10.0f, 33.0f, -12.0f};
 
     // Animation state
     WeaponMotion m_motion;

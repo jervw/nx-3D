@@ -1141,7 +1141,7 @@ void ClientApp::syncRemoteGameItems()
 
     for (auto& item : game_items)
     {
-        if (item.status == "on_ground")
+        if (item.status == "on_ground" && gamemode::hasWeaponProfile(item.item_type))
         {
             if (remote_game_items.find(item.id) == remote_game_items.end())
             {
@@ -1158,8 +1158,17 @@ void ClientApp::syncRemoteGameItems()
                 obj->setCollisionSize(profile.half_extents);
                 if (btRigidBody* body = obj->getRigidBody())
                 {
-                    body->setDamping(0.9f, 1.0f);
+                    body->setDamping(0.35f, 0.8f);
                     body->setSleepingThresholds(0.1f, 0.1f);
+                    if (pending_weapon_throw &&
+                        glm::distance(pending_weapon_throw->position,
+                                      glm::vec3(item.x, item.y, item.z)) < 0.1f)
+                    {
+                        const glm::vec3 impulse = pending_weapon_throw->direction * 320.0f +
+                                                  glm::vec3(0.0f, 75.0f, 0.0f);
+                        body->applyCentralImpulse(btVector3(impulse.x, impulse.y, impulse.z));
+                        pending_weapon_throw.reset();
+                    }
                 }
                 obj->rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
                 obj->scale(glm::vec3(profile.ground_scale));

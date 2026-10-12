@@ -10,11 +10,8 @@ namespace nx3d::server::gun
 
 enum class GunType : uint8_t
 {
-    Pistol,
-    Rifle,
-    SMG,
-    Shotgun,
-    Sniper
+    AK47,
+    M16
 };
 
 struct GunDef

@@ -39,7 +39,7 @@ void FirstPersonGun::render(spear::Camera& camera)
     // Draw directly in camera space. Moving the mesh into world coordinates
     // and back loses precision at the map's large coordinates and makes a
     // nearby weapon visibly tremble as the player moves or turns.
-    glm::vec3 offset = m_viewOffset + m_motion.bob;
+    glm::vec3 offset = m_viewOffset + m_motion.bob + m_motion.reload_offset;
     offset.y += m_motion.recoil;
     offset.z = -offset.z; // Positive forward distance becomes view-space -Z.
     glm::mat4 model = glm::translate(glm::mat4(1.0f), offset);
@@ -50,6 +50,8 @@ void FirstPersonGun::render(spear::Camera& camera)
     model = glm::rotate(model, glm::radians(m_viewRotation.y),
                         glm::vec3(0.0f, 1.0f, 0.0f));
     model = glm::rotate(model, glm::radians(m_viewRotation.z),
+                        glm::vec3(0.0f, 0.0f, 1.0f));
+    model = glm::rotate(model, glm::radians(m_motion.reload_tilt),
                         glm::vec3(0.0f, 0.0f, 1.0f));
 
     // The model was built facing +Z, rotate 180 around Y so it points toward -Z
@@ -81,6 +83,11 @@ void FirstPersonGun::updateAnimation(float delta_time, const glm::vec3& velocity
 void FirstPersonGun::addRecoil(float amount)
 {
     m_motion.kick(amount);
+}
+
+void FirstPersonGun::startReload(float duration)
+{
+    m_motion.startReload(duration);
 }
 
 } // namespace nx3d::client::gun

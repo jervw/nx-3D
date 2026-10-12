@@ -89,8 +89,6 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
         }
     }
 
-    if (m_dropCooldown > 0)
-        m_dropCooldown--;
     if (m_hitmarkerFrames > 0)
     {
         m_hitmarkerFrames--;
@@ -125,47 +123,6 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
         {
             m_fireCooldown += fireIntervalSeconds();
             fireWeapon(app);
-        }
-    }
-
-    // --- Pickup nearby dropped weapons ---
-    if (m_health > 0 && !m_weaponPickedUp && m_dropCooldown == 0 && app.ready && app.client_api.clientInRoom())
-    {
-        glm::vec3 camPos = app.camera.getPosition();
-        auto game_items = app.client_api.getRemoteGameItemsSnapshot(app.client_api.clientRoomId());
-
-        for (auto& item : game_items)
-        {
-            if (item.status == "on_ground")
-            {
-                float dist = glm::distance(camPos, glm::vec3(item.x, item.y, item.z));
-                if (dist < 100.0f)
-                {
-                    m_weaponPickedUp = true;
-                    m_pickedUpItemId = item.id;
-                    m_pickedUpItemSize = glm::vec3(item.w, item.h, item.d);
-                    m_pickedUpItemType = item.item_type;
-                    m_pickedUpItemFilepath = item.filepath;
-
-                    app.tcp_client.sendMessage(
-                            packet::Room::GameItem::update(app.client_api, item.id, "picked_up"));
-
-                    if (app.remote_game_items.find(item.id) != app.remote_game_items.end())
-                    {
-                        app.scene_manager.getCurrentScene()->removeObject(app.remote_game_items[item.id]->getId());
-                        app.pendingDestroy[(app.frameCount - 1) % 3].push_back(
-                                std::move(app.remote_game_items[item.id]));
-                        app.remote_game_items.erase(item.id);
-                    }
-
-                    const auto& profile = getWeaponProfile(item.item_type);
-                    equipGun(app, profile.name, profile.obj_path, profile.mtl_path,
-                             profile.fp_scale, profile.fp_center,
-                             profile.fp_offset, profile.fp_rotation);
-
-                    break;
-                }
-            }
         }
     }
 
@@ -379,6 +336,8 @@ void DeathmatchMode::handleKeyDown(ClientApp& app, const SDL_Event& event)
         startReload(app);
     else if (event.key.key == SDLK_G && m_health > 0 && m_weaponPickedUp)
         dropCurrentWeapon(app);
+    else if (event.key.key == SDLK_F && m_health > 0 && !m_weaponPickedUp)
+        pickupNearbyWeapon(app);
     else if (event.key.key == SDLK_TAB && app.client_api.clientInRoom())
     {
         // Render the locally-maintained leaderboard. No packet is sent: the
@@ -496,7 +455,7 @@ glm::vec3 DeathmatchMode::pickSpawnPoint()
 void DeathmatchMode::equipWeaponForTeam(ClientApp& app)
 {
     const bool isCt = (m_team == "Counter Terrorist");
-    const auto& profile = getWeaponProfile(isCt ? "m4" : "ak47");
+    const auto& profile = getWeaponProfile(isCt ? "m16" : "ak47");
 
     m_pickedUpItemType = profile.type;
 
@@ -506,7 +465,6 @@ void DeathmatchMode::equipWeaponForTeam(ClientApp& app)
 
     m_pickedUpItemId = 0;
     m_pickedUpItemSize = glm::vec3(1.0f, 1.0f, 1.0f);
-    m_pickedUpItemFilepath = profile.obj_path;
 }
 
 void DeathmatchMode::refreshWeaponHud(ClientApp& app)
@@ -527,6 +485,8 @@ void DeathmatchMode::startReload(ClientApp& app)
     m_burstShots = 0;
     m_fireCooldown = 0.0f;
     m_reloadRemaining = getWeaponProfile(m_pickedUpItemType).reload_seconds;
+    if (m_firstPersonGun)
+        m_firstPersonGun->startReload(m_reloadRemaining);
     refreshWeaponHud(app);
     if (app.reload_audio)
         app.reload_audio->play();
@@ -543,6 +503,9 @@ void DeathmatchMode::dropCurrentWeapon(ClientApp& app)
 {
     using packet = nexilis::client::Packet;
 
+    if (!app.ready || !app.client_api.clientInRoom())
+        return;
+
     m_weaponPickedUp = false;
     m_triggerHeld = false;
     m_burstShots = 0;
@@ -556,16 +519,65 @@ void DeathmatchMode::dropCurrentWeapon(ClientApp& app)
         m_pickedUpItemId = 0;
     }
 
-    // Always drop the held gun into the map, so even the team-issued
-    // spawn gun ends up as a physics-driven pickup on the ground.
-    glm::vec3 dropPos = app.camera.getPosition() + app.camera.getFront() * 80.0f;
+    // Place the pickup just ahead of the player. The local physics body gets
+    // a forward impulse when the server echoes the newly created item.
+    glm::vec3 throwDirection = app.camera.getFront();
+    throwDirection.y = 0.0f;
+    if (glm::length(throwDirection) < 0.001f)
+        throwDirection = glm::vec3(0.0f, 0.0f, -1.0f);
+    throwDirection = glm::normalize(throwDirection);
+    glm::vec3 dropPos = app.camera.getPosition() + throwDirection * 25.0f;
+    dropPos.y -= 10.0f;
     auto pos = nexilis::Vector3f({dropPos.x, dropPos.y, dropPos.z});
     auto dim = nexilis::Vector3f({m_pickedUpItemSize.x, m_pickedUpItemSize.y, m_pickedUpItemSize.z});
+    const auto& profile = getWeaponProfile(m_pickedUpItemType);
     app.tcp_client.sendMessage(
             packet::Room::GameItem::create(app.client_api, pos, dim,
-                                           m_pickedUpItemType, "on_ground", m_pickedUpItemFilepath));
+                                           profile.type, "on_ground", profile.obj_path));
+    app.pending_weapon_throw = ClientApp::PendingWeaponThrow{dropPos, throwDirection};
+}
 
-    m_dropCooldown = 60;
+void DeathmatchMode::pickupNearbyWeapon(ClientApp& app)
+{
+    using packet = nexilis::client::Packet;
+    if (!app.ready || !app.client_api.clientInRoom())
+        return;
+
+    const glm::vec3 camPos = app.camera.getPosition();
+    const auto gameItems = app.client_api.getRemoteGameItemsSnapshot(app.client_api.clientRoomId());
+    for (const auto& item : gameItems)
+    {
+        if (item.status != "on_ground" || !hasWeaponProfile(item.item_type))
+            continue;
+        glm::vec3 itemPos(item.x, item.y, item.z);
+        auto localItem = app.remote_game_items.find(item.id);
+        if (localItem != app.remote_game_items.end())
+        {
+            const btVector3 physicsPos = localItem->second->getPosition();
+            itemPos = glm::vec3(physicsPos.x(), physicsPos.y(), physicsPos.z());
+        }
+        if (glm::distance(camPos, itemPos) >= 100.0f)
+            continue;
+
+        m_weaponPickedUp = true;
+        m_pickedUpItemId = item.id;
+        m_pickedUpItemSize = glm::vec3(item.w, item.h, item.d);
+        m_pickedUpItemType = item.item_type;
+        app.tcp_client.sendMessage(packet::Room::GameItem::update(app.client_api, item.id, "picked_up"));
+
+        if (localItem != app.remote_game_items.end())
+        {
+            app.scene_manager.getCurrentScene()->removeObject(localItem->second->getId());
+            app.pendingDestroy[(app.frameCount - 1) % 3].push_back(std::move(localItem->second));
+            app.remote_game_items.erase(localItem);
+        }
+
+        const auto& profile = getWeaponProfile(item.item_type);
+        equipGun(app, profile.name, profile.obj_path, profile.mtl_path,
+                 profile.fp_scale, profile.fp_center,
+                 profile.fp_offset, profile.fp_rotation);
+        return;
+    }
 }
 
 } // namespace nx3d::client::gamemode

@@ -1,6 +1,6 @@
 # nx-3D
 
-nx-3D is a multiplayer first-person shooter with a dedicated server and a Vulkan client. The server offers a bomb match and team deathmatch on de_dust2. Players choose Counter Terrorist or Terrorist and spawn with an M4 or AK-47 respectively. Weapons can be dropped and picked up from the map.
+nx-3D is a multiplayer first-person shooter with a dedicated server and a Vulkan client. The server offers a bomb match and team deathmatch on de_dust2. Players choose Counter Terrorist or Terrorist and spawn with an M16 or AK-47 respectively. Weapons can be dropped and picked up from the map.
 
 ## Requirements
 
@@ -67,21 +67,26 @@ The flake also exposes packaged programs through `nix run .#server` and `nix run
 | Fire | Hold left mouse button |
 | Reload | R |
 | Plant or defuse bomb (bomb match) | Hold E |
-| Drop held weapon | G |
-| Pick up a weapon | Walk near a dropped weapon |
+| Throw held weapon onto the ground | G |
+| Pick up a nearby weapon | F |
 | Leaderboard | Hold Tab |
 | Chat | Y, then Enter to send or Escape to cancel |
 | Pause or resume | Escape |
 
 The equipped gun appears beside the camera and follows the view. It has walk bob and recoil. The gun mesh is selected from the team's weapon profile or the weapon picked up from the ground. First-person placement and animation live in `client/gun/first_person_gun.cc`; per-weapon mesh paths, scale, and center are in `client/gamemode/weapon_profiles.hh`.
 
+The AK-47 and M16 are original low-poly models in `assets/weapons/`. Run
+`python3 assets/weapons/generate.py` to regenerate their OBJ and MTL files.
+The AK-47 uses a black polymer and metal palette; the M16 uses charcoal and
+gunmetal. Their materials use generated 1-pixel swatch textures.
+
 Other players appear as custom low-poly OBJ figures: a blue armored Counter Terrorist and a tan Terrorist with a head wrap and utility vest. The figures and their texture atlases live in `assets/players/`; see its README for the generator and dimensions. Figures update when a player's team becomes known or changes at halftime. The client-side shot box spans the figures from headgear to boots.
 
-Both rifles hold 30 shots. R reloads a partly empty magazine in 2.5 seconds; firing is disabled while reloading. The weapon HUD shows remaining ammunition and reload status. Ammunition is currently managed by the client, matching the existing client-reported hit model. Dead players see a red and black WASTED screen and cannot move or turn until respawning. Deathmatch respawns take 2 seconds; bomb rounds have a 4-second break. Fallen player models tumble under Bullet physics. A respawn or new bomb round refills the magazine.
+Both rifles hold 30 shots. R reloads a partly empty magazine in 2.5 seconds; firing is disabled while reloading. The held rifle dips and tilts during the reload, then returns to its ready position. The weapon HUD shows remaining ammunition and reload status. Ammunition is currently managed by the client, matching the existing client-reported hit model. Dead players see a red and black WASTED screen and cannot move or turn until respawning. Deathmatch respawns take 2 seconds; bomb rounds have a 4-second break. Fallen player models tumble under Bullet physics. A respawn or new bomb round refills the magazine.
 
 Reload and planting sounds play locally and are relayed to nearby players through Nexilis positional audio. A bomb explosion sound plays for everyone when the server declares an explosion win. The three original PCM assets are `assets/sounds/reload.wav`, `planting.wav`, and `explosion.wav`; regenerate them with `python3 assets/sounds/generate.py`.
 
-Weapons render in camera space to avoid shaking from world-coordinate rounding. Their default pose is angled inward with a slight roll. `client/gun/weapon_motion.hh` controls the subtle walking cadence and time-based recoil recovery; vertical movement, small ground-contact jitter, and respawn teleports do not drive the bob animation.
+Weapons render in camera space to avoid shaking from world-coordinate rounding. Their default pose sits toward the lower right at an angled FPS stance. `client/gun/weapon_motion.hh` controls the subtle walking cadence, time-based recoil recovery, and reload motion; vertical movement, small ground-contact jitter, and respawn teleports do not drive the bob animation. G tosses the current rifle ahead as a physics-driven pickup. Press F near a dropped rifle to equip it; it stays on the ground until picked up.
 
 ## Bomb match rules and queue
 
