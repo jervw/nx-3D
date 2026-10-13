@@ -33,7 +33,7 @@
       # the NixOS module feeds it a never-ending stream of input.
       mkServer = pkgs: nexilisPkg: pkgs.stdenv.mkDerivation {
         pname = "nx-3d-server";
-        version = "0.1.0";
+        version = "0.1.1";
 
         src = self.outPath;
 
@@ -71,7 +71,7 @@
       # `spear` flake input instead of an (empty, uninitialised) submodule.
       mkClient = pkgs: nexilisPkg: pkgs.stdenv.mkDerivation {
         pname = "nx-3d-client";
-        version = "0.1.0";
+        version = "0.1.1";
 
         src = self.outPath;
 
@@ -139,7 +139,7 @@ cd "$PWD/repo/client"
 
           nexilisPkg = pkgs.stdenv.mkDerivation {
             pname = "nexilis";
-            version = "0.1.0";
+            version = "0.1.1";
 
             src = nexilis;
 
