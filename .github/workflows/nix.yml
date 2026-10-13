@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
     paths: ['flake.nix', 'flake.lock', 'server/**', 'client/**', 'cmake/**', 'nexilis', 'spear', '.github/workflows/nix.yml']
-  pull_request:
-    paths: ['flake.nix', 'flake.lock', 'server/**', 'client/**', 'cmake/**', 'nexilis', 'spear', '.github/workflows/nix.yml']
   workflow_dispatch:
 
 permissions:
