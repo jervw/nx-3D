@@ -6,7 +6,7 @@ nx-3D is a multiplayer first-person shooter with a dedicated server and a Vulkan
 
 - Linux with a Vulkan-capable graphics driver and SDL3 audio support.
 - CMake 3.30 or newer and a C++20 compiler.
-- The `spear` and `nexilis` Git submodules. Nexilis is a private SSH dependency in this repository.
+- The public `spear` and `nexilis` Git submodules.
 - The libraries used by `spear` and `nexilis`. The Nix development shell in `flake.nix` supplies these dependencies.
 
 Clone with submodules:
@@ -92,9 +92,9 @@ The first version uses one shared bomb: any living Terrorist may hold E for thre
 
 ## Manual releases
 
-Set the Actions repository secret `RELEASE_READ_TOKEN` in `nexilistudios/nx-3D` to a token with read access to both `Nexilislib/nexilis` and `NeuronActivation/spear`. With GitHub CLI, use `gh secret set RELEASE_READ_TOKEN -R nexilistudios/nx-3D` and paste the token when prompted. Commit and push the default branch, then run **Game release** from the GitHub Actions tab or use `gh workflow run release.yml`. Leave the version input blank to increment the patch version from `VERSION.txt`, or enter a newer version such as `0.2.0`. Watch the run with `gh run list --workflow release.yml`.
+Commit and push the default branch, then run **Game release** from the GitHub Actions tab or use `gh workflow run release.yml`. Leave the version input blank to increment the patch version from `VERSION.txt`, or enter a newer version such as `0.2.0`. Watch the run with `gh run list --workflow release.yml`.
 
-After all builds succeed, the workflow updates `VERSION.txt` and the package versions in `flake.nix`, tags the release, and publishes five GitHub release assets: Linux and Windows archives for both server and client, plus a source archive. The source archive contains this repository's tracked files and submodule references; access to the private submodule repositories is still needed to build it. Linux clients run `run.sh` from the extracted archive; Windows clients run `run.bat`. The release workflow has no schedule.
+After all builds succeed, the workflow updates `VERSION.txt` and the package versions in `flake.nix`, tags the release, and publishes five GitHub release assets: Linux and Windows archives for both server and client, plus a source archive. The source archive contains this repository's tracked files and submodule references; clone the tagged repository with submodules to build from source. Linux clients run `run.sh` from the extracted archive; Windows clients run `run.bat`. The release workflow has no schedule.
 
 ## Verification and release status
 

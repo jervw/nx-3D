@@ -1,6 +1,6 @@
 [submodule "spear"]
 	path = spear
-	url = git@github.com:NeuronActivation/spear.git
+	url = https://github.com/NeuronActivation/spear.git
 [submodule "nexilis"]
 	path = nexilis
-	url = git@github.com:Nexilislib/nexilis.git
+	url = https://github.com/Nexilislib/nexilis.git
