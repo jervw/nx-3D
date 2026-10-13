@@ -48,14 +48,6 @@ Use `docker compose logs -f server` to view its output and `docker compose down`
 
 The client initially asks for a server address and username. Enter an IPv4 address or domain name (for example, `game.example.com`); the default is `127.0.0.1`. You can also start it with `-server <address> -username <name>` to connect immediately. Select a room with the arrow keys and Enter, then choose a team with `1` or `2`.
 
-To reopen the most recent Codex conversation for this repository, run:
-
-```sh
-./resume-codex.sh
-```
-
-The script can be run from any directory. Extra arguments are passed to `codex resume`.
-
 The flake also exposes packaged programs through `nix run .#server` and `nix run .#client`. Its Nexilis input uses SSH access to the private repository.
 
 ## Controls
