@@ -339,6 +339,7 @@ void ClientApp::pauseGame()
     if (currentState == State::Game)
     {
         currentState = State::Paused;
+        eventHandler.clearMovementKeys();
         quitHovered = false;
         SDL_SetWindowRelativeMouseMode(window.getSDLWindow(), false);
         ui->pauseTitle.setString("PAUSED");
@@ -813,6 +814,17 @@ void ClientApp::run()
             const bool canMove = currentState != State::Game ||
                                  (game_mode && game_mode->canMove());
             eventHandler.handleEvents(movement_controller, delta_time, canMove);
+        }
+
+        // Pausing stops player input, but an airborne player still needs
+        // gravity and ground detection so they do not remain suspended until
+        // the game is resumed.
+        if (currentState == State::Paused && !movement_controller.isOnGround())
+        {
+            static const std::unordered_map<SDL_Keycode, bool> noMovementKeys = {
+                    {SDLK_W, false}, {SDLK_S, false}, {SDLK_A, false},
+                    {SDLK_D, false}, {SDLK_SPACE, false}};
+            movement_controller.processInput(noMovementKeys, delta_time);
         }
 
         // --- Render ---
