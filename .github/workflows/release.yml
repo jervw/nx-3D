@@ -1,18 +1,18 @@
-name: Manual game release
+name: Game release
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (for example 0.1.1)'
-        required: true
+        description: "Optional release version; blank increments the patch version"
+        required: false
         type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: manual-game-release
+  group: game-release
   cancel-in-progress: false
 
 jobs:
@@ -29,10 +29,30 @@ jobs:
       - name: Validate release version
         id: version
         env:
-          VERSION: ${{ inputs.version }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          VERSION="$(python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          current = Path('VERSION.txt').read_text().strip()
+          requested = os.environ['REQUESTED_VERSION']
+          pattern = r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+          def parts(value):
+              match = re.fullmatch(pattern, value)
+              if not match:
+                  raise SystemExit(f'Invalid version {value!r}; expected MAJOR.MINOR.PATCH')
+              return tuple(map(int, match.groups()))
+
+          major, minor, patch = parts(current)
+          version = requested or f'{major}.{minor}.{patch + 1}'
+          if parts(version) <= (major, minor, patch):
+              raise SystemExit(f'Release version {version} must be newer than {current}')
+          print(version)
+          PY
+          )"
           git fetch --tags origin
           ! git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -283,7 +303,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
-          pattern: '*'
+          pattern: "*"
           merge-multiple: true
           path: release-assets
       - name: Check all release archives
@@ -305,15 +325,33 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          current = Path('VERSION.txt').read_text().strip()
+          version = os.environ['RELEASE_VERSION']
+          flake_path = Path('flake.nix')
+          flake = flake_path.read_text()
+          old = f'version = "{current}";'
+          if flake.count(old) != 3:
+              raise SystemExit(f'Expected three flake.nix version fields matching {current}')
+          flake_path.write_text(flake.replace(old, f'version = "{version}";'))
+          Path('VERSION.txt').write_text(version + '\n')
+          PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add VERSION.txt
-          if ! git diff --cached --quiet; then
-            git commit -m "Release $RELEASE_TAG"
-          fi
+          git add VERSION.txt flake.nix
+          git commit -m "Release $RELEASE_TAG"
           git tag -a "$RELEASE_TAG" -m "nx-3D $RELEASE_TAG"
           git push --atomic origin "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$RELEASE_TAG"
+      - name: Archive release source
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          git archive --format=tar.gz --prefix="nx-3D-v${RELEASE_VERSION}/" \
+            --output="release-assets/nx-3D-source-v${RELEASE_VERSION}.tar.gz" HEAD
+          test -s "release-assets/nx-3D-source-v${RELEASE_VERSION}.tar.gz"
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -60,18 +60,18 @@ The flake also exposes packaged programs through `nix run .#server` and `nix run
 
 ## Controls
 
-| Action | Control |
-| --- | --- |
-| Move and look | WASD and mouse |
-| Jump | Space |
-| Fire | Hold left mouse button |
-| Reload | R |
-| Plant or defuse bomb (bomb match) | Hold E |
-| Throw held weapon onto the ground | G |
-| Pick up a nearby weapon | F |
-| Leaderboard | Hold Tab |
-| Chat | Y, then Enter to send or Escape to cancel |
-| Pause or resume | Escape |
+| Action                            | Control                                   |
+| --------------------------------- | ----------------------------------------- |
+| Move and look                     | WASD and mouse                            |
+| Jump                              | Space                                     |
+| Fire                              | Hold left mouse button                    |
+| Reload                            | R                                         |
+| Plant or defuse bomb (bomb match) | Hold E                                    |
+| Throw held weapon onto the ground | G                                         |
+| Pick up a nearby weapon           | F                                         |
+| Leaderboard                       | Hold Tab                                  |
+| Chat                              | Y, then Enter to send or Escape to cancel |
+| Pause or resume                   | Escape                                    |
 
 The equipped gun appears beside the camera and follows the view. It has walk bob and recoil. The gun mesh is selected from the team's weapon profile or the weapon picked up from the ground. First-person placement and animation live in `client/gun/first_person_gun.cc`; per-weapon mesh paths, scale, and center are in `client/gamemode/weapon_profiles.hh`.
 
@@ -86,6 +86,8 @@ Both rifles hold 30 shots. R reloads a partly empty magazine in 2.5 seconds; fir
 
 Reload and planting sounds play locally and are relayed to nearby players through Nexilis positional audio. A bomb explosion sound plays for everyone when the server declares an explosion win. The three original PCM assets are `assets/sounds/reload.wav`, `planting.wav`, and `explosion.wav`; regenerate them with `python3 assets/sounds/generate.py`.
 
+Gunshots use a louder volume curve and a 2500-unit spatial range so distant firing remains audible across much of the map while fading with distance. The volume control still mutes all sounds at zero.
+
 Weapons render in camera space to avoid shaking from world-coordinate rounding. Their default pose sits toward the lower right at an angled FPS stance. `client/gun/weapon_motion.hh` controls the subtle walking cadence, time-based recoil recovery, and reload motion; vertical movement, small ground-contact jitter, and respawn teleports do not drive the bob animation. G tosses the current rifle ahead as a physics-driven pickup. Press F near a dropped rifle to equip it; it stays on the ground until picked up.
 
 ## Bomb match rules and queue
@@ -98,9 +100,9 @@ The first version uses one shared bomb: any living Terrorist may hold E for thre
 
 ## Manual releases
 
-Set the Actions repository secret `RELEASE_READ_TOKEN` in `nexilistudios/nx-3D` to a token with read access to both `Nexilislib/nexilis` and `NeuronActivation/spear`. With GitHub CLI, use `gh secret set RELEASE_READ_TOKEN -R nexilistudios/nx-3D` and paste the token when prompted. Commit and push the default branch, then run `bash scripts/release.sh 0.1.1` (replace the version with the version you want). The script requires GitHub CLI authentication and starts the `manual-release.yml` workflow. Watch the run with `gh run list --workflow manual-release.yml`.
+Set the Actions repository secret `RELEASE_READ_TOKEN` in `nexilistudios/nx-3D` to a token with read access to both `Nexilislib/nexilis` and `NeuronActivation/spear`. With GitHub CLI, use `gh secret set RELEASE_READ_TOKEN -R nexilistudios/nx-3D` and paste the token when prompted. Commit and push the default branch, then run **Game release** from the GitHub Actions tab or use `gh workflow run release.yml`. Leave the version input blank to increment the patch version from `VERSION.txt`, or enter a newer version such as `0.2.0`. Watch the run with `gh run list --workflow release.yml`.
 
-After all builds succeed, the workflow updates `VERSION.txt`, tags the release, and publishes four GitHub release assets: Linux and Windows archives for both server and client. Linux clients run `run.sh` from the extracted archive; Windows clients run `run.bat`. The release workflow has no schedule.
+After all builds succeed, the workflow updates `VERSION.txt` and the package versions in `flake.nix`, tags the release, and publishes five GitHub release assets: Linux and Windows archives for both server and client, plus a source archive. The source archive contains this repository's tracked files and submodule references; access to the private submodule repositories is still needed to build it. Linux clients run `run.sh` from the extracted archive; Windows clients run `run.bat`. The release workflow has no schedule.
 
 ## Verification and release status
 
@@ -110,16 +112,16 @@ Before a public release, exercise multiplayer sessions on real Vulkan hardware, 
 
 ## Project layout
 
-| Path | Purpose |
-| --- | --- |
-| `client/app/` | Client loop, rendering, networking, input, and UI state |
-| `client/gamemode/` | Bomb and deathmatch presentation, weapon handling, and profiles |
-| `client/gun/` | First-person weapon rendering and animation |
-| `client/crosshair/`, `client/ui/` | Crosshair and menus/HUD |
-| `server/` | Dedicated server, rooms, and gun logic |
-| `shared/` | Types shared by client and server |
-| `assets/` | Map, gun models, textures, fonts, and sounds |
-| `tests/`, `cmake/` | Gameplay regression checks and shared dependency build configuration |
-| `spear/`, `nexilis/` | Engine and networking submodules |
+| Path                              | Purpose                                                              |
+| --------------------------------- | -------------------------------------------------------------------- |
+| `client/app/`                     | Client loop, rendering, networking, input, and UI state              |
+| `client/gamemode/`                | Bomb and deathmatch presentation, weapon handling, and profiles      |
+| `client/gun/`                     | First-person weapon rendering and animation                          |
+| `client/crosshair/`, `client/ui/` | Crosshair and menus/HUD                                              |
+| `server/`                         | Dedicated server, rooms, and gun logic                               |
+| `shared/`                         | Types shared by client and server                                    |
+| `assets/`                         | Map, gun models, textures, fonts, and sounds                         |
+| `tests/`, `cmake/`                | Gameplay regression checks and shared dependency build configuration |
+| `spear/`, `nexilis/`              | Engine and networking submodules                                     |
 
 The server creates one bomb room and one deathmatch room. The client uses Nexilis for room and player synchronization, while `spear` supplies Vulkan rendering, physics, input, and audio. Client assets are resolved relative to the repository root compiled into `PROJECT_ROOT` by CMake.

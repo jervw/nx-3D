@@ -84,6 +84,7 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
     audio_system.init();
     gunshot_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/gunshot.wav"));
+    gunshot_audio->setSpatialRange(1200.0f, 2500.0f);
     hitmarker_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/hitmarker.wav"));
     reload_audio = std::make_unique<spear::audio::Sound>(
@@ -310,7 +311,7 @@ void ClientApp::changeVolume(float delta)
 void ClientApp::applyAudioVolume()
 {
     if (gunshot_audio)
-        gunshot_audio->setVolume(audioVolume);
+        gunshot_audio->setVolume(std::sqrt(audioVolume));
     if (hitmarker_audio)
         hitmarker_audio->setVolume(audioVolume);
     if (reload_audio)
