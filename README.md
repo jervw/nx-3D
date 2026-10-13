@@ -18,13 +18,24 @@ cd nx-3D
 
 ## Build and run
 
-On Nix-enabled Linux, enter the development shell with `nix develop`. With the dependencies available, build both programs and run the regression checks:
+On Nix-enabled Linux, enter the development shell with `nix develop`. With the dependencies available, build both programs:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build --parallel 2
-ctest --test-dir build --output-on-failure
 ```
+
+### Run the tests locally
+
+From the repository root, run the test script in the Nix development shell:
+
+```sh
+nix develop -c ./scripts/run_tests.sh
+```
+
+The script configures and builds in `build-tests`, then runs all nine game tests, including the three that link against Spear. If you are already inside the Nix shell, run `./scripts/run_tests.sh` directly. You can pass CTest options to select a case, for example `./scripts/run_tests.sh -R '^bomb_mode$'`.
+
+The **Tests** GitHub Actions workflow runs the full suite on pushes and pull requests. To start it manually, choose **Tests** in the Actions tab and select **Run workflow**, or run `gh workflow run tests.yml`. It uses the submodule revisions recorded in this repository.
 
 The default build compiles Nexilis from the checked-out submodule in the same build as its consumers. Rebuild after updating submodules: newer Nexilis headers with an older `libnexilis.so` can corrupt the client event queues and crash on damage/death messages. Restart all running clients and servers after rebuilding.
 
