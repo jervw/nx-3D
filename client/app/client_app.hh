@@ -180,7 +180,7 @@ public:
     // --- Chat ---------------------------------------------------------------------
     /// Whether the chat input line is open (typing "y" toggles it).
     bool chatActive = false;
-    /// The text currently being typed.
+    /// The text currently being typed (limited to chat::kMaxMessageCharacters).
     std::string chatInput;
     /// Last string pushed to the chat input line (blinking cursor diffing).
     std::string lastChatDisplay;

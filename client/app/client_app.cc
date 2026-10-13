@@ -1,5 +1,6 @@
 #include <client/app/client_app.hh>
 
+#include <client/chat/chat_text.hh>
 #include <client/gamemode/bomb_mode.hh>
 #include <client/gamemode/deathmatch_mode.hh>
 #include <client/gamemode/weapon_profiles.hh>
@@ -426,7 +427,8 @@ void ClientApp::updateChatMessages()
             const auto* sender = message.getClient();
             const std::string name = sender ? sender->getUsername() : std::string("unknown");
 
-            chatMessages.push_back({name, message.getPayload()});
+            chatMessages.push_back(
+                    {name, chat::truncate(message.getPayload(), chat::kMaxMessageCharacters)});
             if (static_cast<int>(chatMessages.size()) > kChatMaxLines)
                 chatMessages.erase(chatMessages.begin());
 
@@ -455,14 +457,22 @@ void ClientApp::updateChatWindow(float delta_time)
         return;
     }
 
-    // Fill the rows with the most recent messages (newest at the bottom).
-    const int total = static_cast<int>(chatMessages.size());
+    // Wrap messages into visual lines, then retain the newest lines that fit.
+    std::vector<std::string> lines;
+    for (const auto& message : chatMessages)
+    {
+        auto wrapped = chat::wrapMessage(message.username, message.payload);
+        lines.insert(lines.end(), wrapped.begin(), wrapped.end());
+    }
+    if (lines.size() > static_cast<std::size_t>(kChatMaxLines))
+        lines.erase(lines.begin(), lines.end() - kChatMaxLines);
+
     for (int i = 0; i < kChatMaxLines; ++i)
     {
-        if (i < total)
-            ui->setChatRow(i, chatMessages[i].username, chatMessages[i].payload);
+        if (i < static_cast<int>(lines.size()))
+            ui->setChatLine(i, lines[i]);
         else
-            ui->setChatRow(i, "", "");
+            ui->setChatLine(i, "");
     }
 }
 
@@ -783,12 +793,12 @@ void ClientApp::run()
                     }
                     else if (event.key.key == SDLK_BACKSPACE && !chatInput.empty())
                     {
-                        chatInput.pop_back();
+                        chat::popBack(chatInput);
                     }
                 }
                 if (event.type == SDL_EVENT_TEXT_INPUT)
                 {
-                    chatInput += event.text.text;
+                    chat::appendWithinLimit(chatInput, event.text.text);
                 }
                 if (event.type == SDL_EVENT_WINDOW_RESIZED)
                 {
@@ -885,7 +895,9 @@ void ClientApp::run()
             // typing, plus the visibility countdown and row re-sync.
             if (chatActive)
             {
-                std::string chatDisplay = chatInput + (((frameCount / 30) % 2 == 0) ? "|" : " ");
+                std::string chatDisplay =
+                        chat::tail(chatInput, chat::kLineCharacters - 1) +
+                        (((frameCount / 30) % 2 == 0) ? "|" : " ");
                 if (chatDisplay != lastChatDisplay)
                 {
                     lastChatDisplay = chatDisplay;

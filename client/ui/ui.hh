@@ -142,8 +142,8 @@ public:
     void setChatVisible(bool visible);
     /// Render the chat backdrop quad (used from the overlay callback).
     void renderChatOverlay(spear::ui::RenderContext ctx);
-    /// Update one chat message row (oldest at the top). Empty strings clear it.
-    void setChatRow(int index, const std::string& username, const std::string& payload);
+    /// Update one visual chat line (oldest at the top). An empty string clears it.
+    void setChatLine(int index, const std::string& content);
     /// Clear all chat message rows.
     void clearChatRows();
     /// Set the text shown on the chat input line (empty hides it).

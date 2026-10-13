@@ -400,18 +400,11 @@ void Ui::renderChatOverlay(spear::ui::RenderContext ctx)
         m_chatBackdropQuad->render(ctx);
 }
 
-void Ui::setChatRow(int index, const std::string& username, const std::string& payload)
+void Ui::setChatLine(int index, const std::string& content)
 {
     if (index < 0 || index >= kChatMaxLines)
         return;
     auto& text = *chatMessageRows[index];
-
-    std::string content;
-    if (!username.empty() || !payload.empty())
-        content = username + ": " + payload;
-    // Keep the line inside the chat panel (monospace FiraCode at ~18pt).
-    if (content.size() > 34)
-        content = content.substr(0, 34);
 
     // Only rebuild the texture when the content actually changed, otherwise
     // every frame causes a GPU stall.
