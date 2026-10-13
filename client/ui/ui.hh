@@ -68,7 +68,8 @@ public:
 
     /// Render the pause menu overlay (quads only; used from the overlay
     /// callback that also draws the crosshair).
-    void renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered);
+    void renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
+                            bool ctHovered, bool tHovered);
     void renderDeathOverlay(spear::ui::RenderContext ctx);
 
     /// Show the Tab leaderboard with the given entries. Terrorists are shown
@@ -115,6 +116,9 @@ public:
     spear::ui::vulkan::Text bombText;
 
     spear::ui::vulkan::Text pauseTitle;
+    spear::ui::vulkan::Text pauseTeamTitle;
+    spear::ui::vulkan::Text pauseCTText;
+    spear::ui::vulkan::Text pauseTText;
     spear::ui::vulkan::Text pauseVolumeText;
     spear::ui::vulkan::Text pauseQuitText;
     spear::ui::vulkan::Text pauseInstructions;
@@ -174,6 +178,10 @@ private:
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderTrack;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderFill;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderKnob;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseCTButton;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseCTButtonHover;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseTButton;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseTButtonHover;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseQuitButton;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseQuitButtonHover;
 

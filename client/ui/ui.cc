@@ -72,6 +72,12 @@ Ui::Ui(VkDevice device,
 
       pauseTitle(device, physDevice, commandPool, graphicsQueue,
                  descriptorPool, descriptorSetLayout, fontPath, 48),
+      pauseTeamTitle(device, physDevice, commandPool, graphicsQueue,
+                     descriptorPool, descriptorSetLayout, fontPath, 18),
+      pauseCTText(device, physDevice, commandPool, graphicsQueue,
+                  descriptorPool, descriptorSetLayout, fontPath, 16),
+      pauseTText(device, physDevice, commandPool, graphicsQueue,
+                 descriptorPool, descriptorSetLayout, fontPath, 16),
       pauseVolumeText(device, physDevice, commandPool, graphicsQueue,
                       descriptorPool, descriptorSetLayout, fontPath, 24),
       pauseQuitText(device, physDevice, commandPool, graphicsQueue,
@@ -153,7 +159,7 @@ Ui::Ui(VkDevice device,
     teamSelectTitle.setColor(SDL_Color{255, 255, 255, 255});
     teamSelectTitle.setPosition(glm::vec2(-0.3f, 0.4f));
 
-    teamSelectInstructions.setString("1 = CT    2 = T    |    Click a team to join");
+    teamSelectInstructions.setString("Click a team to join");
     teamSelectInstructions.setColor(SDL_Color{200, 200, 200, 255});
     teamSelectInstructions.setPosition(glm::vec2(-0.25f, -0.3f));
 
@@ -193,9 +199,21 @@ Ui::Ui(VkDevice device,
     pauseTitle.setColor(SDL_Color{255, 255, 255, 255});
     pauseTitle.setPosition(glm::vec2(-0.17f, 0.47f));
 
+    pauseTeamTitle.setString("");
+    pauseTeamTitle.setColor(SDL_Color{200, 200, 200, 255});
+    pauseTeamTitle.setPosition(glm::vec2(-0.15f, 0.30f));
+
+    pauseCTText.setString("");
+    pauseCTText.setColor(SDL_Color{210, 235, 255, 255});
+    pauseCTText.setPosition(glm::vec2(-0.39f, 0.15f));
+
+    pauseTText.setString("");
+    pauseTText.setColor(SDL_Color{255, 220, 180, 255});
+    pauseTText.setPosition(glm::vec2(0.12f, 0.15f));
+
     pauseVolumeText.setString("");
     pauseVolumeText.setColor(SDL_Color{255, 200, 0, 255});
-    pauseVolumeText.setPosition(glm::vec2(-0.17f, 0.17f));
+    pauseVolumeText.setPosition(glm::vec2(-0.17f, -0.02f));
 
     pauseQuitText.setString("");
     pauseQuitText.setColor(SDL_Color{255, 255, 255, 255});
@@ -273,19 +291,43 @@ void Ui::buildPauseMenu()
     m_pauseSliderTrack = std::make_shared<spear::ui::vulkan::Quad2D>(
             m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
             makeSolidTexture(90, 90, 100, 255));
-    m_pauseSliderTrack->setPosition(glm::vec2(-0.45f, 0.0f));
+    m_pauseSliderTrack->setPosition(glm::vec2(-0.45f, -0.16f));
     m_pauseSliderTrack->setSize(glm::vec2(0.9f, 0.07f));
 
     m_pauseSliderFill = std::make_shared<spear::ui::vulkan::Quad2D>(
             m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
             makeSolidTexture(255, 150, 0, 255));
-    m_pauseSliderFill->setPosition(glm::vec2(-0.45f, 0.0f));
+    m_pauseSliderFill->setPosition(glm::vec2(-0.45f, -0.16f));
     m_pauseSliderFill->setSize(glm::vec2(0.9f, 0.07f));
 
     m_pauseSliderKnob = std::make_shared<spear::ui::vulkan::Quad2D>(
             m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
             makeSolidTexture(255, 210, 0, 255));
     m_pauseSliderKnob->setSize(glm::vec2(0.05f, 0.15f));
+
+    m_pauseCTButton = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(35, 85, 135, 255));
+    m_pauseCTButton->setPosition(glm::vec2(-0.44f, 0.10f));
+    m_pauseCTButton->setSize(glm::vec2(0.42f, 0.13f));
+
+    m_pauseCTButtonHover = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(55, 135, 205, 255));
+    m_pauseCTButtonHover->setPosition(glm::vec2(-0.44f, 0.10f));
+    m_pauseCTButtonHover->setSize(glm::vec2(0.42f, 0.13f));
+
+    m_pauseTButton = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(135, 75, 25, 255));
+    m_pauseTButton->setPosition(glm::vec2(0.02f, 0.10f));
+    m_pauseTButton->setSize(glm::vec2(0.42f, 0.13f));
+
+    m_pauseTButtonHover = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(210, 120, 35, 255));
+    m_pauseTButtonHover->setPosition(glm::vec2(0.02f, 0.10f));
+    m_pauseTButtonHover->setSize(glm::vec2(0.42f, 0.13f));
 
     m_pauseQuitButton = std::make_shared<spear::ui::vulkan::Quad2D>(
             m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
@@ -482,6 +524,9 @@ void Ui::showGameHudTexts()
     registerText(matchStatusText);
     registerText(bombText);
     registerText(pauseTitle);
+    registerText(pauseTeamTitle);
+    registerText(pauseCTText);
+    registerText(pauseTText);
     registerText(pauseVolumeText);
     registerText(pauseQuitText);
     registerText(pauseInstructions);
@@ -500,7 +545,8 @@ void Ui::showGameHudTexts()
         registerText(*row);
 }
 
-void Ui::renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered)
+void Ui::renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
+                            bool ctHovered, bool tHovered)
 {
     if (m_pauseBackdropQuad)
         m_pauseBackdropQuad->render(ctx);
@@ -508,6 +554,20 @@ void Ui::renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered)
         m_pausePanelBorder->render(ctx);
     if (m_pausePanel)
         m_pausePanel->render(ctx);
+    if (ctHovered)
+    {
+        if (m_pauseCTButtonHover)
+            m_pauseCTButtonHover->render(ctx);
+    }
+    else if (m_pauseCTButton)
+        m_pauseCTButton->render(ctx);
+    if (tHovered)
+    {
+        if (m_pauseTButtonHover)
+            m_pauseTButtonHover->render(ctx);
+    }
+    else if (m_pauseTButton)
+        m_pauseTButton->render(ctx);
     if (m_pauseSliderTrack)
         m_pauseSliderTrack->render(ctx);
     if (m_pauseSliderFill)
@@ -596,7 +656,7 @@ void Ui::updateVolumeDisplay(float volume)
     if (m_pauseSliderFill)
         m_pauseSliderFill->setSize(glm::vec2(fillWidth, 0.07f));
     if (m_pauseSliderKnob)
-        m_pauseSliderKnob->setPosition(glm::vec2(-0.45f + fillWidth - 0.025f, -0.04f));
+        m_pauseSliderKnob->setPosition(glm::vec2(-0.45f + fillWidth - 0.025f, -0.20f));
 }
 
 } // namespace nx3d::client::ui

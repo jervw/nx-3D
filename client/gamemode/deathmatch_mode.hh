@@ -40,6 +40,7 @@ public:
     void handleMouseButtonUp(ClientApp& app, const SDL_Event& event) override;
     void handleKeyDown(ClientApp& app, const SDL_Event& event) override;
     void handleKeyUp(ClientApp& app, const SDL_Event& event) override;
+    void changeTeam(ClientApp& app, const std::string& team) override;
 
 protected:
     void equipGun(ClientApp& app, const std::string& weaponName,

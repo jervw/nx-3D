@@ -67,6 +67,21 @@ void BombMode::onTeamSelected(nexilis::server::Room& room, uint64_t playerId)
         // A queued player is a spectator until admitted at a round boundary.
         room.damagePlayer(playerId, 100.0f);
     }
+    if (m_phase == Phase::waiting)
+    {
+        bool hasT = false;
+        bool hasCT = false;
+        for (auto id : room.getClients())
+        {
+            hasT |= room.getPlayerTeam(id) == kT;
+            hasCT |= room.getPlayerTeam(id) == kCT;
+        }
+        if (!hasT || !hasCT)
+            m_notice = std::string("Cannot start game because ") +
+                       (!hasT ? kT : kCT) + " team is empty";
+        else
+            m_notice = "Starting round";
+    }
     publish(room);
 }
 
@@ -78,8 +93,8 @@ bool BombMode::canDamage(uint64_t shooterId, uint64_t targetId) const
 
 bool BombMode::canSelectTeam(uint64_t playerId) const
 {
-    std::lock_guard lock(m_mutex);
-    return m_phase == Phase::waiting || !m_players.contains(playerId);
+    (void)playerId;
+    return true;
 }
 
 bool BombMode::teamAlive(nexilis::server::Room& room, const std::string& team) const
@@ -185,14 +200,12 @@ void BombMode::startRound(nexilis::server::Room& room)
                     nexilis::server::Command::playerStatsEntries(room, room.getClients()), 0));
     }
 
-    // Fill empty team slots in FIFO order; players arriving mid-round wait.
+    // Admit every queued player at the round boundary. Players arriving during
+    // a live round still wait until the current round is over.
     for (auto it = m_queue.begin(); it != m_queue.end();)
     {
         const auto team = room.getPlayerTeam(*it);
-        size_t count = 0;
-        for (auto id : m_players)
-            count += room.getPlayerTeam(id) == team;
-        if ((team == kT || team == kCT) && count < kMaxPlayersPerTeam)
+        if (team == kT || team == kCT)
         {
             m_players.insert(*it);
             it = m_queue.erase(it);
@@ -210,7 +223,8 @@ void BombMode::startRound(nexilis::server::Room& room)
     if (!hasT || !hasCT)
     {
         m_phase = Phase::waiting;
-        m_notice = "Waiting for both teams";
+        m_notice = std::string("Cannot start game because ") +
+                   (!hasT ? kT : kCT) + " team is empty";
         m_seconds = 0.0f;
         publish(room);
         return;

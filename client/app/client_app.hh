@@ -140,6 +140,8 @@ public:
     // --- Pause / audio -------------------------------------------------------
     float audioVolume = 0.1f;
     bool quitHovered = false;
+    bool ctTeamHovered = false;
+    bool tTeamHovered = false;
 
     // --- Textures -------------------------------------------------------------
     std::shared_ptr<spear::rendering::vulkan::STBTexture> wallnut_texture;

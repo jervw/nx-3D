@@ -342,10 +342,15 @@ void ClientApp::pauseGame()
         currentState = State::Paused;
         eventHandler.clearMovementKeys();
         quitHovered = false;
+        ctTeamHovered = false;
+        tTeamHovered = false;
         SDL_SetWindowRelativeMouseMode(window.getSDLWindow(), false);
         ui->pauseTitle.setString("PAUSED");
+        ui->pauseTeamTitle.setString("CHANGE TEAM");
+        ui->pauseCTText.setString("COUNTER TERRORIST");
+        ui->pauseTText.setString("TERRORIST");
         ui->pauseQuitText.setString("[ QUIT GAME ]");
-        ui->pauseInstructions.setString("ESC: Resume   |   L/R: Volume   |   Enter or Click: Quit");
+        ui->pauseInstructions.setString("ESC: Resume | Click team | L/R: Volume | Enter: Quit");
         changeVolume(0.0f);
     }
 }
@@ -355,8 +360,14 @@ void ClientApp::resumeGame()
     if (currentState == State::Paused)
     {
         currentState = State::Game;
+        quitHovered = false;
+        ctTeamHovered = false;
+        tTeamHovered = false;
         SDL_SetWindowRelativeMouseMode(window.getSDLWindow(), true);
         ui->pauseTitle.setString("");
+        ui->pauseTeamTitle.setString("");
+        ui->pauseCTText.setString("");
+        ui->pauseTText.setString("");
         ui->pauseVolumeText.setString("");
         ui->pauseQuitText.setString("");
         ui->pauseInstructions.setString("");
@@ -670,17 +681,6 @@ void ClientApp::run()
                             }
                         }
                     }
-                    if (currentState == State::TeamSelect)
-                    {
-                        if (event.key.key == SDLK_1)
-                        {
-                            enterGame("Counter Terrorist");
-                        }
-                        else if (event.key.key == SDLK_2)
-                        {
-                            enterGame("Terrorist");
-                        }
-                    }
                 }
                 if (event.type == SDL_EVENT_WINDOW_RESIZED)
                 {
@@ -748,8 +748,10 @@ void ClientApp::run()
                     float mx = (static_cast<float>(event.motion.x) / static_cast<float>(live_w ? live_w : 1)) * 2.0f - 1.0f;
                     float my = 1.0f - (static_cast<float>(event.motion.y) / static_cast<float>(live_h ? live_h : 1)) * 2.0f;
                     quitHovered = (mx >= -0.42f && mx <= 0.42f && my >= -0.37f && my <= -0.25f);
+                    ctTeamHovered = (mx >= -0.44f && mx <= -0.02f && my >= 0.10f && my <= 0.23f);
+                    tTeamHovered = (mx >= 0.02f && mx <= 0.44f && my >= 0.10f && my <= 0.23f);
                     if ((event.motion.state & SDL_BUTTON_LMASK) &&
-                        mx >= -0.45f && mx <= 0.45f && my >= -0.04f && my <= 0.11f)
+                        mx >= -0.45f && mx <= 0.45f && my >= -0.20f && my <= -0.05f)
                     {
                         setVolumeNormalized((mx + 0.45f) / 0.9f);
                     }
@@ -760,7 +762,19 @@ void ClientApp::run()
                     SDL_GetWindowSize(window.getSDLWindow(), &live_w, &live_h);
                     float mx = (static_cast<float>(event.button.x) / static_cast<float>(live_w ? live_w : 1)) * 2.0f - 1.0f;
                     float my = 1.0f - (static_cast<float>(event.button.y) / static_cast<float>(live_h ? live_h : 1)) * 2.0f;
-                    if (mx >= -0.45f && mx <= 0.45f && my >= -0.04f && my <= 0.11f)
+                    if (game_mode && mx >= -0.44f && mx <= -0.02f && my >= 0.10f && my <= 0.23f)
+                    {
+                        game_mode->changeTeam(*this, "Counter Terrorist");
+                        resumeGame();
+                        break;
+                    }
+                    if (game_mode && mx >= 0.02f && mx <= 0.44f && my >= 0.10f && my <= 0.23f)
+                    {
+                        game_mode->changeTeam(*this, "Terrorist");
+                        resumeGame();
+                        break;
+                    }
+                    if (mx >= -0.45f && mx <= 0.45f && my >= -0.20f && my <= -0.05f)
                     {
                         setVolumeNormalized((mx + 0.45f) / 0.9f);
                     }

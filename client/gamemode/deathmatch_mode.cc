@@ -386,6 +386,23 @@ void DeathmatchMode::handleKeyDown(ClientApp& app, const SDL_Event& event)
     }
 }
 
+void DeathmatchMode::changeTeam(ClientApp& app, const std::string& team)
+{
+    if (team == m_team)
+        return;
+
+    m_team = team;
+    app.ui->teamDisplayText.setString(m_team);
+    app.tcp_client.sendMessage(
+            nexilis::client::Packet::Room::Player3D::setTeam(app.client_api, team));
+
+    // Issue the selected side's standard weapon immediately. The player's
+    // position and life state are retained; their next respawn uses the new
+    // team's spawn points.
+    m_weaponPickedUp = true;
+    equipWeaponForTeam(app);
+}
+
 void DeathmatchMode::handleKeyUp(ClientApp& app, const SDL_Event& event)
 {
     if (event.key.key == SDLK_TAB)
@@ -437,7 +454,8 @@ void DeathmatchMode::equipGun(ClientApp& app,
                                           {
         auto ctx = spear::ui::RenderContext{spear::rendering::vulkan::g_frameContext.commandBuffer};
         if (app.currentState == ClientApp::State::Paused)
-            app.ui->renderPauseOverlay(ctx, app.quitHovered);
+            app.ui->renderPauseOverlay(ctx, app.quitHovered,
+                                       app.ctTeamHovered, app.tTeamHovered);
         else if (app.game_mode && app.game_mode->isEliminated())
             app.ui->renderDeathOverlay(ctx);
         if (app.ui->isLeaderboardVisible())

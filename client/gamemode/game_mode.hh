@@ -40,6 +40,11 @@ public:
     /// Called once when the player enters the game after choosing a team.
     virtual void onEnter(ClientApp& app, const std::string& team) = 0;
 
+    /// Request a team change from an in-game menu.
+    virtual void changeTeam(ClientApp&, const std::string&)
+    {
+    }
+
     /// Called every frame while the app is in the Game state.
     virtual void update(ClientApp& app, float delta_time) = 0;
 

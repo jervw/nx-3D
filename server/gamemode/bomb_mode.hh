@@ -36,7 +36,6 @@ private:
         post,
         finished
     };
-    static constexpr size_t kMaxPlayersPerTeam = 5;
     void publish(nexilis::server::Room& room);
     void startRound(nexilis::server::Room& room);
     void endRound(nexilis::server::Room& room, bool terroristsWin, const std::string& reason);

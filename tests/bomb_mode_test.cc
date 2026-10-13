@@ -49,6 +49,22 @@ int main()
         return static_cast<const client::ClientAPI::BombMatchEvent&>(*events.back());
     };
     add(10, t, "Terrorist");
+    GameModeRegistry::update(1.0f);
+    check(!room->canDamage(10, 20), "Round started with an empty Counter Terrorist team");
+    auto waiting = t.consumeMatchEvents();
+    check(bomb(waiting).notice ==
+                  "Cannot start game because Counter Terrorist team is empty",
+          "Missing-team error was not sent to clients");
+
+    check(room->canSelectTeam(10), "Waiting player could not switch team");
+    room->setPlayerTeam(10, "Counter Terrorist");
+    GameModeRegistry::update(1.0f);
+    auto waitingForT = t.consumeMatchEvents();
+    check(bomb(waitingForT).notice ==
+                  "Cannot start game because Terrorist team is empty",
+          "Terrorist empty-team error was not sent to clients");
+    room->setPlayerTeam(10, "Terrorist");
+
     add(20, ct, "Counter Terrorist");
     GameModeRegistry::update(1.0f);
     check(room->canDamage(10, 20), "Round failed to start");
@@ -96,7 +112,7 @@ int main()
     check(bomb(secondHalf).round == 13 &&
                   bomb(secondHalf).counter_terrorist_score == 11,
           "Half-time score was not carried to new sides");
-    check(!room->canSelectTeam(10), "Active player could switch team");
+    check(room->canSelectTeam(10), "Active player could not switch team");
 
     check(room->onPlayerAction(20, 1), "Second-half plant rejected");
     GameModeRegistry::update(3.1f);

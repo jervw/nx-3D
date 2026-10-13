@@ -67,7 +67,7 @@ docker compose up --build -d
 
 Use `docker compose logs -f server` to view its output and `docker compose down` to stop it. Compose uses host networking on Linux. Remote clients need the configured authentication TCP, session TCP, and UDP ports. Allow these ports through the host firewall and forward them on the router when hosting behind NAT. The client accepts an IPv4 address or hostname in `-server`. The server currently has hardcoded credentials (`password` for players and `root` for administration); change them in `server/server.cc` before exposing it publicly.
 
-The client initially asks for a server address and username. Enter an IPv4 address or domain name (for example, `game.example.com`); the default is `127.0.0.1`. You can also start it with `-server <address> -username <name>` to connect immediately. Select a room with the arrow keys and Enter, then choose a team with `1` or `2`.
+The client initially asks for a server address and username. Enter an IPv4 address or domain name (for example, `game.example.com`); the default is `127.0.0.1`. You can also start it with `-server <address> -username <name>` to connect immediately. Select a room with the arrow keys and Enter, then click a team to join.
 
 The flake also exposes packaged programs through `nix run .#server` and `nix run .#client`. Its Nexilis input uses SSH access to the private repository.
 
@@ -82,6 +82,7 @@ The flake also exposes packaged programs through `nix run .#server` and `nix run
 | Plant or defuse bomb (bomb match) | Hold E                                    |
 | Throw held weapon onto the ground | G                                         |
 | Pick up a nearby weapon           | F                                         |
+| Change team                       | Escape, then click CT or T                |
 | Leaderboard                       | Hold Tab                                  |
 | Chat                              | Y, then Enter to send or Escape to cancel |
 | Pause or resume                   | Escape                                    |
@@ -93,7 +94,7 @@ The AK-47 and M16 are original low-poly models in `assets/weapons/`. Run
 The AK-47 uses a black polymer and metal palette; the M16 uses charcoal and
 gunmetal. Their materials use generated 1-pixel swatch textures.
 
-Other players appear as custom low-poly OBJ figures: a blue armored Counter Terrorist and a tan Terrorist with a head wrap and utility vest. The figures and their texture atlases live in `assets/players/`; see its README for the generator and dimensions. Figures update when a player's team becomes known or changes at halftime. The client-side shot box spans the figures from headgear to boots.
+Other players appear as custom low-poly OBJ figures: a blue armored Counter Terrorist and a tan Terrorist with a head wrap and utility vest. The figures and their texture atlases live in `assets/players/`; see its README for the generator and dimensions. Figures update when a player's team becomes known or changes. The client-side shot box spans the figures from headgear to boots.
 
 Both rifles hold 30 shots. R reloads a partly empty magazine in 2.5 seconds; firing is disabled while reloading. The held rifle dips and tilts during the reload, then returns to its ready position. The weapon HUD shows remaining ammunition and reload status. Ammunition is currently managed by the client, matching the existing client-reported hit model. Dead players see a red and black WASTED screen and cannot move or turn until respawning. Deathmatch respawns take 2 seconds; bomb rounds have a 4-second break. Fallen player models tumble under Bullet physics. A respawn or new bomb round refills the magazine.
 
@@ -105,7 +106,7 @@ Weapons render in camera space to avoid shaking from world-coordinate rounding. 
 
 ## Bomb match rules and queue
 
-The Bomb Match room starts when at least one player has chosen each team. Team selection places a player in the room's FIFO queue. Up to five players per side enter at the next round boundary; a player who joins during a live round watches until the next one. The HUD shows queue position, score, round, time, life state, and bomb state. Deaths have no immediate respawn. Only living participants can shoot, plant, or defuse. Leaving the room removes a player from the match or queue.
+The Bomb Match room starts when at least one player has chosen each team. If either team is empty, every client sees which team is preventing the game from starting. Players may switch teams from the Escape menu, with no team size or balance restriction. A player who joins during a live round watches until the next one. The HUD shows queue position, score, round, time, life state, and bomb state. Deaths have no immediate respawn. Only living participants can shoot, plant, or defuse. Leaving the room removes a player from the match or queue.
 
 The match uses MR12: twelve rounds per half, side swap after round 12, first to 13 rounds wins, and a 12–12 score after round 24 is a draw. A round lasts 115 seconds. The Terrorists win by eliminating all Counter Terrorists or by letting a planted bomb explode. Counter Terrorists win by eliminating all Terrorists before the bomb is planted, defusing it, or surviving until time expires before a plant. If all Terrorists die after planting, the bomb still needs to be defused. There are five seconds between rounds; a completed match restarts after ten seconds.
 
