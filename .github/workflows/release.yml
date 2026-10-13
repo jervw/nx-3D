@@ -127,18 +127,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libboost-json-dev libssl-dev libglm-dev patchelf \
             libvulkan-dev libsdl3-dev libsdl3-image-dev libsdl3-ttf-dev \
-            libsdl3-mixer-dev libglew-dev libbullet-dev libshaderc-dev \
+            libglew-dev libbullet-dev libshaderc-dev \
             glslang-dev spirv-tools-dev pkg-config libgl-dev
           python3 -m venv "$RUNNER_TEMP/cmake-venv"
           "$RUNNER_TEMP/cmake-venv/bin/pip" install 'cmake>=3.30,<5'
           echo "$RUNNER_TEMP/cmake-venv/bin" >> "$GITHUB_PATH"
+      - name: Build SDL3 mixer
+        run: |
+          curl -fsSL https://github.com/libsdl-org/SDL_mixer/releases/download/release-3.2.4/SDL3_mixer-3.2.4.tar.gz \
+            -o "$RUNNER_TEMP/SDL3_mixer-3.2.4.tar.gz"
+          echo '182a07c745375e113dc740d43964ff21b0be29f29f59876c4dbc4db3d32f6901  '"$RUNNER_TEMP/SDL3_mixer-3.2.4.tar.gz" | sha256sum -c -
+          tar -xf "$RUNNER_TEMP/SDL3_mixer-3.2.4.tar.gz" -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/SDL3_mixer-3.2.4" -B "$RUNNER_TEMP/sdl3-mixer-build" \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/sdl3-mixer" \
+            -DCMAKE_INSTALL_LIBDIR=lib -DSDLMIXER_TESTS=OFF -DSDLMIXER_EXAMPLES=OFF \
+            -DSDLMIXER_GME=OFF -DSDLMIXER_MOD=OFF -DSDLMIXER_MIDI=OFF \
+            -DSDLMIXER_OPUS=OFF -DSDLMIXER_WAVPACK=OFF \
+            -DSDLMIXER_FLAC_LIBFLAC=OFF -DSDLMIXER_MP3_MPG123=OFF \
+            -DSDLMIXER_VORBIS_VORBISFILE=OFF
+          cmake --build "$RUNNER_TEMP/sdl3-mixer-build" --parallel 4
+          cmake --install "$RUNNER_TEMP/sdl3-mixer-build"
       - name: Build and package Linux client
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           printf '%s\n' "$RELEASE_VERSION" > VERSION.txt
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/sdl3-mixer/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           CI=1 cmake -S . -B build-release-linux-client -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF -DNX3D_PORTABLE_CLIENT=ON
+            -DBUILD_TESTING=OFF -DNX3D_PORTABLE_CLIENT=ON \
+            -DSDL3_mixer_DIR="$RUNNER_TEMP/sdl3-mixer/lib/cmake/SDL3_mixer"
           cmake --build build-release-linux-client --target nx_3D_client --parallel 4
           python3 scripts/package_linux_client.py --build-dir build-release-linux-client
           test -s "dist/nx-3D-client-v${RELEASE_VERSION}-linux-x64.tar.gz"
