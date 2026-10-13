@@ -80,7 +80,7 @@ Use `docker compose logs -f server` to view its output and `docker compose down`
 
 The client initially asks for a server address and username. Enter an IPv4 address or domain name (for example, `game.example.com`); the default is `127.0.0.1`. You can also start it with `-server <address> -username <name>` to connect immediately. Select a room with the arrow keys and Enter, then click a team to join.
 
-The flake also exposes packaged programs through `nix run .#server` and `nix run .#client`. Its Nexilis input uses SSH access to the private repository.
+The flake also exposes packaged programs through `nix run .#server` and `nix run .#client`. Its Nexilis and Spear sources follow the submodule commits recorded by this repository.
 
 ## Controls
 
