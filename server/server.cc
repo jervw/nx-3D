@@ -20,6 +20,7 @@
 
 #include <shared/gamemode.hh>
 #include <shared/network_ports.hh>
+#include <shared/player_rules.hh>
 
 #include <atomic>
 #include <chrono>
@@ -63,6 +64,13 @@ int main(int argc, char* argv[])
     server_config.setMode(AuthenticationMode::password_protected);
     server_config.setPassphrase("password");
     server_config.setRootPassword("root");
+    auto& limits = server_config.getGameplayLimits();
+    limits.setMaxHorizontalPosition(nx3d::kMaxHorizontalPosition);
+    limits.setMinHeight(nx3d::kMinPlayerHeight);
+    limits.setMaxHeight(nx3d::kMaxPlayerHeight);
+    limits.setMaxMovementSpeed(nx3d::kMaxMovementSpeed);
+    limits.setMaxShootingRate(nx3d::kMaxShootingRate);
+    limits.setMaxDamagePerShot(nx3d::kMaxDamagePerShot);
 
     namespace gamemode = nx3d::server::gamemode;
 

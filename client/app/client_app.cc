@@ -16,6 +16,7 @@
 
 #include <shared/fall_death.hh>
 #include <shared/gamemode.hh>
+#include <shared/player_rules.hh>
 
 #include <glm/gtc/quaternion.hpp>
 
@@ -33,7 +34,7 @@ namespace vk = spear::rendering::vulkan;
 
 ClientApp::ClientApp(const std::string& initialServerAddress, const std::string& initialUsername, bool connectOnStart)
     : window("nx_3D game", spear::BaseWindow::Size{820, 640}),
-      camera(glm::vec3(-1600.0f, 64.0f, -2600.0f), glm::vec3(0.f, 1.f, 0.f), 90.0f, 0.f, 250.f),
+      camera(glm::vec3(-1600.0f, 64.0f, -2600.0f), glm::vec3(0.f, 1.f, 0.f), 90.0f, 0.f, nx3d::kWalkSpeed),
       scene_manager(),
       bullet_world(),
       shared_world(std::make_shared<btDiscreteDynamicsWorld>(*bullet_world.getDynamicsWorld())),
@@ -1184,6 +1185,16 @@ void ClientApp::syncRemotePlayerTransforms(float deltaTime)
     auto room_id = client_api.clientRoomId();
     auto my_id = client_api.getClientId();
     auto players = client_api.getRemotePlayersSnapshot(room_id, my_id);
+    const std::string ownTeam = ui->teamDisplayText.getString();
+    std::unordered_map<uint64_t, std::string> playerNames;
+    for (const auto& room : client_api.getActiveRooms())
+    {
+        if (room.getId() != room_id)
+            continue;
+        for (const auto& client : room.getClients())
+            playerNames.emplace(client.getId(), client.getUsername());
+        break;
+    }
 
     for (auto& player : players)
     {
@@ -1242,6 +1253,10 @@ void ClientApp::syncRemotePlayerTransforms(float deltaTime)
         remote_player_animations.erase(id);
     }
 
+    std::vector<ui::PlayerNameplate> nameplates;
+    nameplates.reserve(players.size());
+    const glm::mat4 viewProjection = camera.getProjectionMatrix() * camera.getViewMatrix();
+    const glm::vec3 cameraPosition = camera.getPosition();
     for (auto& player : players)
     {
         auto it = remote_players.find(player.id);
@@ -1260,7 +1275,7 @@ void ClientApp::syncRemotePlayerTransforms(float deltaTime)
             const float distance = glm::length(movement);
             const float speed = dt > 0.0f && distance < 40.0f ? distance / dt : 0.0f;
             motion.facing = player.yaw;
-            motion.speed += (std::clamp(speed / 250.0f, 0.0f, 1.0f) - motion.speed) *
+            motion.speed += (std::clamp(speed / nx3d::kWalkSpeed, 0.0f, 1.0f) - motion.speed) *
                             std::min(1.0f, dt * 10.0f);
             motion.stride += motion.speed * dt * 7.0f;
             motion.hitTime = std::max(0.0f, motion.hitTime - dt);
@@ -1275,8 +1290,39 @@ void ClientApp::syncRemotePlayerTransforms(float deltaTime)
             pose = glm::rotate(pose, std::sin(motion.stride) * 0.035f * motion.speed + std::sin(motion.hitTime / 0.22f * 3.14159f) * 0.14f,
                                glm::vec3(0.0f, 0.0f, 1.0f));
             it->second->setModel(pose);
+
+            auto name = playerNames.find(player.id);
+            if (name != playerNames.end() && !name->second.empty())
+            {
+                ui::PlayerNameplate plate{player.id, chat::truncate(name->second, 24)};
+                plate.enemy = !ownTeam.empty() && remote_player_teams.at(player.id) != ownTeam;
+                const glm::vec3 head = glm::vec3(pose * glm::vec4(0.0f, 20.0f, 0.0f, 1.0f));
+                const glm::vec4 clip = viewProjection * glm::vec4(head, 1.0f);
+                if (clip.w > 0.0f && clip.z >= -clip.w && clip.z <= clip.w &&
+                    glm::distance(cameraPosition, head) < 2000.0f)
+                {
+                    plate.anchor = glm::vec2(clip) / clip.w;
+                    plate.visible = std::abs(plate.anchor.x) < 0.95f &&
+                                    std::abs(plate.anchor.y) < 0.95f;
+                    if (plate.visible && mapCollisionBody)
+                    {
+                        const btVector3 from(cameraPosition.x, cameraPosition.y, cameraPosition.z);
+                        const btVector3 to(head.x, head.y, head.z);
+                        btCollisionWorld::AllHitsRayResultCallback ray(from, to);
+                        shared_world->rayTest(from, to, ray);
+                        for (int i = 0; i < ray.m_collisionObjects.size(); ++i)
+                            if (ray.m_collisionObjects[i] == mapCollisionBody)
+                            {
+                                plate.visible = false;
+                                break;
+                            }
+                    }
+                }
+                nameplates.push_back(std::move(plate));
+            }
         }
     }
+    ui->updatePlayerNameplates(nameplates);
 
     for (auto it = remote_dead_players.begin(); it != remote_dead_players.end();)
     {

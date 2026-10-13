@@ -1,6 +1,8 @@
 #ifndef NX3D_CLIENT_GUN_WEAPON_MOTION_HH
 #define NX3D_CLIENT_GUN_WEAPON_MOTION_HH
 
+#include <shared/player_rules.hh>
+
 #include <glm/glm.hpp>
 
 #include <algorithm>
@@ -30,7 +32,7 @@ struct WeaponMotion
         if (grounded && std::isfinite(speed) && speed > 20.0f && speed < 500.0f)
         {
             constexpr float tau = 6.28318530718f;
-            const float pace = std::min(speed / 250.0f, 1.0f);
+            const float pace = std::min(speed / nx3d::kWalkSpeed, 1.0f);
             phase = std::fmod(phase + dt * tau * 1.5f * pace, tau);
             target.x = std::sin(phase) * 0.004f * pace;
             target.y = std::cos(phase * 2.0f) * 0.003f * pace;

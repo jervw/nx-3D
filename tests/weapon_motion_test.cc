@@ -1,4 +1,5 @@
 #include <client/gun/weapon_motion.hh>
+#include <shared/player_rules.hh>
 
 #include <iostream>
 #include <limits>
@@ -30,7 +31,7 @@ int main()
 
             for (int frame = 0; frame < fps * 2; ++frame)
             {
-                motion.update(1.0f / fps, {250.0f, 0.0f, 0.0f}, true);
+                motion.update(1.0f / fps, {nx3d::kWalkSpeed, 0.0f, 0.0f}, true);
                 require(std::abs(motion.bob.x) <= 0.0041f && std::abs(motion.bob.y) <= 0.0031f,
                         "Walking motion exceeds its bounds");
             }
@@ -53,7 +54,7 @@ int main()
                     "Reload animation does not settle when reloading finishes");
         }
         WeaponMotion motion;
-        motion.update(1.0f / 60.0f, {250.0f, 0.0f, 0.0f}, false);
+        motion.update(1.0f / 60.0f, {nx3d::kWalkSpeed, 0.0f, 0.0f}, false);
         motion.update(1.0f / 60.0f, {100000.0f, 0.0f, 0.0f}, true);
         require(glm::length(motion.bob) == 0.0f, "Airborne motion or teleport causes bob");
         motion.update(std::numeric_limits<float>::quiet_NaN(), {}, true);

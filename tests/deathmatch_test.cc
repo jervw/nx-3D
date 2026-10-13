@@ -84,6 +84,9 @@ int main()
         shopper->getObject3D().setPosition(Vector3f{0.0f, 0.0f, 0.0f});
         require(!room->onPlayerAction(10, 13), "Remote purchase was accepted");
         server::ServerConfig settings;
+        // This fixture fires hundreds of shots back-to-back to exercise
+        // death/respawn; production keeps its separate fire-rate limit.
+        settings.getGameplayLimits().setMaxShootingRate(0.0f);
         server::Command command(settings);
         TestProtocol protocol;
 

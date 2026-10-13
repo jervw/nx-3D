@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace nx3d::client::ui
@@ -20,6 +21,15 @@ struct LeaderboardEntry
     std::string team;
     uint64_t kills = 0;
     uint64_t deaths = 0;
+};
+
+struct PlayerNameplate
+{
+    uint64_t id = 0;
+    std::string username;
+    glm::vec2 anchor{0.0f};
+    bool visible = false;
+    bool enemy = false;
 };
 
 /// All of the user interface elements of the client: the menu screens,
@@ -166,6 +176,9 @@ public:
     /// Set the text shown on the chat input line (empty hides it).
     void setChatInput(const std::string& text);
 
+    void updatePlayerNameplates(const std::vector<PlayerNameplate>& players);
+    void renderPlayerNameplates(spear::ui::RenderContext ctx);
+
 private:
     void buildPauseMenu();
     void buildDeathOverlay();
@@ -183,6 +196,13 @@ private:
     std::string m_fontPath;
 
     spear::ui::vulkan::UIRenderer m_renderer;
+    struct NameplateText
+    {
+        std::unique_ptr<spear::ui::vulkan::Text> text;
+        bool visible = false;
+        bool enemy = false;
+    };
+    std::unordered_map<uint64_t, NameplateText> m_playerNameplates;
 
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseBackdropQuad;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_deathBackdropQuad;

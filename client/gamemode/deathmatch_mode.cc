@@ -653,7 +653,10 @@ void DeathmatchMode::installOverlay(ClientApp& app)
         if (app.ui->isLeaderboardVisible())
             app.ui->renderLeaderboardOverlay(ctx);
         app.ui->renderChatOverlay(ctx);
-        if (m_crosshair && m_health > 0 && app.currentState == ClientApp::State::Game)
+        if (app.currentState == ClientApp::State::Game ||
+            app.currentState == ClientApp::State::Paused)
+            app.ui->renderPlayerNameplates(ctx);
+        if (m_crosshair && m_health > 0)
             m_crosshair->render(app.camera); });
 }
 

@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <unordered_set>
 
 namespace nx3d::client::ui
 {
@@ -487,6 +489,50 @@ void Ui::setChatInput(const std::string& text)
         chatInputText.setString(text);
 }
 
+void Ui::updatePlayerNameplates(const std::vector<PlayerNameplate>& players)
+{
+    std::unordered_set<uint64_t> active;
+    for (const auto& player : players)
+    {
+        active.insert(player.id);
+        auto& plate = m_playerNameplates[player.id];
+        plate.visible = player.visible && !player.username.empty();
+        if (!plate.visible)
+            continue;
+
+        if (!plate.text)
+        {
+            plate.text = std::make_unique<spear::ui::vulkan::Text>(
+                    m_device, m_physDevice, m_commandPool, m_graphicsQueue,
+                    m_descriptorPool, m_descriptorSetLayout, m_fontPath, 20, 0.002f);
+        }
+        if (plate.enemy != player.enemy)
+        {
+            plate.enemy = player.enemy;
+            plate.text->setColor(player.enemy ? SDL_Color{255, 70, 70, 255}
+                                              : SDL_Color{255, 255, 255, 255});
+        }
+        if (plate.text->getString() != player.username)
+            plate.text->setString(player.username);
+
+        const glm::vec2 size = plate.text->getSize();
+        const glm::vec2 position(player.anchor.x - size.x * 0.5f,
+                                 player.anchor.y + 0.025f);
+        if (glm::distance(plate.text->getPosition(), position) > 0.003f)
+            plate.text->setPosition(position);
+    }
+
+    for (auto it = m_playerNameplates.begin(); it != m_playerNameplates.end();)
+        it = active.contains(it->first) ? std::next(it) : m_playerNameplates.erase(it);
+}
+
+void Ui::renderPlayerNameplates(spear::ui::RenderContext ctx)
+{
+    for (auto& [id, plate] : m_playerNameplates)
+        if (plate.visible && plate.text)
+            plate.text->render(ctx);
+}
+
 void Ui::setRowText(spear::ui::vulkan::Text& text, const LeaderboardEntry& entry)
 {
     // Pad the name to a fixed width for column alignment.
@@ -506,6 +552,7 @@ void Ui::setRowText(spear::ui::vulkan::Text& text, const LeaderboardEntry& entry
 void Ui::showMenuTexts()
 {
     clear();
+    m_playerNameplates.clear();
     registerText(titleText);
     registerText(statusText);
     registerText(instructionsText);
@@ -514,6 +561,7 @@ void Ui::showMenuTexts()
 void Ui::showServerInputTexts()
 {
     clear();
+    m_playerNameplates.clear();
     registerText(serverInputLabel);
     registerText(serverAddressText);
     registerText(usernameInputLabel);
@@ -524,6 +572,7 @@ void Ui::showServerInputTexts()
 void Ui::showTeamSelectTexts()
 {
     clear();
+    m_playerNameplates.clear();
     registerText(teamSelectTitle);
     registerText(teamSelectInstructions);
     registerText(ctButtonText);
