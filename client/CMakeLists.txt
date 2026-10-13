@@ -12,12 +12,19 @@ include(../cmake/Nexilis.cmake)
 
 add_subdirectory(../spear/engine spear_engine)
 
-# nixpkgs' shaderc package ships libshaderc_shared but the pkg-config
-# advertises shaderc_combined. Fix the spear target's link libraries.
-get_target_property(_spear_links spear INTERFACE_LINK_LIBRARIES)
-if(_spear_links)
-  string(REPLACE "shaderc_combined" "shaderc_shared" _spear_links "${_spear_links}")
-  set_target_properties(spear PROPERTIES INTERFACE_LINK_LIBRARIES "${_spear_links}")
+# nixpkgs advertises shaderc_combined through pkg-config but only ships
+# shaderc_shared. Ubuntu ships shaderc_combined, so use it when available.
+find_library(NX3D_SHADERC_COMBINED_LIBRARY NAMES shaderc_combined)
+if(NOT NX3D_SHADERC_COMBINED_LIBRARY)
+  find_library(NX3D_SHADERC_SHARED_LIBRARY NAMES shaderc_shared)
+  if(NOT NX3D_SHADERC_SHARED_LIBRARY)
+    message(FATAL_ERROR "Neither shaderc_combined nor shaderc_shared was found")
+  endif()
+  get_target_property(_spear_links spear INTERFACE_LINK_LIBRARIES)
+  if(_spear_links)
+    string(REPLACE "shaderc_combined" "shaderc_shared" _spear_links "${_spear_links}")
+    set_target_properties(spear PROPERTIES INTERFACE_LINK_LIBRARIES "${_spear_links}")
+  endif()
 endif()
 
 file(GLOB_RECURSE NX3D_CLIENT_SOURCES CONFIGURE_DEPENDS
