@@ -1,5 +1,6 @@
 #include <nexilis/command_type.hh>
 #include <nexilis/object/game_item.hh>
+#include <nexilis/ports.hh>
 #include <nexilis/protocol_manager.hh>
 #include <nexilis/room_command_type.hh>
 #include <nexilis/room_data.hh>
@@ -18,6 +19,7 @@
 #include <server/gun/gun_manager.hh>
 
 #include <shared/gamemode.hh>
+#include <shared/network_ports.hh>
 
 #include <atomic>
 #include <chrono>
@@ -37,8 +39,21 @@ nexilis::server::Room createRoom(const std::string& name)
 
 } // namespace
 
-int main()
+int main(int argc, char* argv[])
 {
+    try
+    {
+        const auto ports = nx3d::parseNetworkPorts(argc, argv);
+        nexilis::Ports::setBoostTCPPort(ports.tcp);
+        nexilis::Ports::setBoostUDPPort(ports.udp);
+        nexilis::Ports::setBoostTCPSessionPort(ports.tcpSession);
+    }
+    catch (const std::invalid_argument& error)
+    {
+        std::cerr << "Invalid network port: " << error.what() << std::endl;
+        return 1;
+    }
+
     nexilis::Log::startConsoleLogging(nexilis::logger::LogLevel::Info);
 
     using namespace nexilis::server;

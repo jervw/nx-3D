@@ -509,7 +509,7 @@ void ClientApp::run()
         // --- State machine ---
         if (currentState == State::Connecting &&
             tcp_client.getProtocolStatus() == nexilis::client::ProtocolStatus::error)
-            ui->statusText.setString("Connection failed. Check server address and TCP ports 54200/54202.");
+            ui->statusText.setString("Connection failed. Check the server address and TCP port settings.");
 
         if (currentState == State::Connecting && ready && !menuPopulated)
         {

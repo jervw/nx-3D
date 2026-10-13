@@ -38,6 +38,10 @@ target_include_directories(player_hit_test PRIVATE ..)
 target_link_libraries(player_hit_test PRIVATE glm::glm)
 add_test(NAME player_hit COMMAND player_hit_test)
 
+add_executable(network_ports_test network_ports_test.cc)
+target_include_directories(network_ports_test PRIVATE ..)
+add_test(NAME network_ports COMMAND network_ports_test)
+
 if(TARGET spear)
     add_executable(movement_controller_test movement_controller_test.cc)
     target_compile_definitions(movement_controller_test PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")

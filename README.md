@@ -37,6 +37,27 @@ Run the server first, then the client in another terminal:
 ./build/client/nx_3D_client
 ```
 
+The default network ports remain TCP 54200 for authentication, TCP 54202 for the game session, and UDP 54201 for gameplay. To run a server on different ports, pass all three values:
+
+```sh
+./build/server/nx-3D-server \
+  --tcp-port 55200 \
+  --tcp-session-port 55202 \
+  --udp-port 55201
+```
+
+Clients connecting to that server need its authentication TCP and UDP ports. The session TCP port does not need a client argument because the server sends it to the client during authentication:
+
+```sh
+./build/client/nx_3D_client \
+  --server game.example.com \
+  --username player \
+  --tcp-port 55200 \
+  --udp-port 55201
+```
+
+Each port option is optional. An omitted option keeps its default value, so the existing commands continue to work unchanged. Ports must be numbers from 1 through 65535. The single-dash forms (`-tcp-port`, `-tcp-session-port`, and `-udp-port`) are also accepted for consistency with the existing client arguments.
+
 To run only the server with Docker on Linux, initialize the Nexilis submodule and start Compose:
 
 ```sh
@@ -44,7 +65,7 @@ git submodule update --init --recursive nexilis
 docker compose up --build -d
 ```
 
-Use `docker compose logs -f server` to view its output and `docker compose down` to stop it. Compose uses host networking on Linux. Remote clients need TCP 54200 for authentication, TCP 54202 for the game session, and UDP 54201 for gameplay. Allow these ports through the host firewall and forward them on the router when hosting behind NAT. The client accepts an IPv4 address or hostname in `-server`. The server currently has hardcoded credentials (`password` for players and `root` for administration); change them in `server/server.cc` before exposing it publicly.
+Use `docker compose logs -f server` to view its output and `docker compose down` to stop it. Compose uses host networking on Linux. Remote clients need the configured authentication TCP, session TCP, and UDP ports. Allow these ports through the host firewall and forward them on the router when hosting behind NAT. The client accepts an IPv4 address or hostname in `-server`. The server currently has hardcoded credentials (`password` for players and `root` for administration); change them in `server/server.cc` before exposing it publicly.
 
 The client initially asks for a server address and username. Enter an IPv4 address or domain name (for example, `game.example.com`); the default is `127.0.0.1`. You can also start it with `-server <address> -username <name>` to connect immediately. Select a room with the arrow keys and Enter, then choose a team with `1` or `2`.
 
