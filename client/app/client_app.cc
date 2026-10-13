@@ -254,6 +254,7 @@ void ClientApp::setupScenes()
     btRigidBody::btRigidBodyConstructionInfo meshRbInfo(0.0f, meshMotionState, meshShape);
     auto* meshRigidBody = new btRigidBody(meshRbInfo);
     shared_world->addRigidBody(meshRigidBody);
+    mapCollisionBody = meshRigidBody;
 
     auto game_objects = spear::Scene::Container{
             dust2_model};

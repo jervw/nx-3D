@@ -23,6 +23,42 @@ namespace
 constexpr float kRecoilStartMultiplier = 0.6f;
 constexpr float kRecoilStep = 0.15f;
 constexpr float kMaxRecoilMultiplier = 2.5f;
+
+class MapRayResultCallback : public btCollisionWorld::ClosestRayResultCallback
+{
+public:
+    MapRayResultCallback(const btVector3& from, const btVector3& to,
+                         const btCollisionObject* mapBody)
+        : btCollisionWorld::ClosestRayResultCallback(from, to),
+          m_mapBody(mapBody)
+    {
+    }
+
+    btScalar addSingleResult(btCollisionWorld::LocalRayResult& result,
+                             bool normalInWorldSpace) override
+    {
+        if (result.m_collisionObject != m_mapBody)
+            return 1.0f;
+        return ClosestRayResultCallback::addSingleResult(result, normalInWorldSpace);
+    }
+
+private:
+    const btCollisionObject* m_mapBody;
+};
+
+bool mapBlocksShot(const ClientApp& app, const glm::vec3& origin,
+                   const glm::vec3& direction, float targetDistance)
+{
+    if (!app.mapCollisionBody || !app.shared_world || !std::isfinite(targetDistance))
+        return false;
+
+    const glm::vec3 target = origin + direction * targetDistance;
+    const btVector3 from(origin.x, origin.y, origin.z);
+    const btVector3 to(target.x, target.y, target.z);
+    MapRayResultCallback hit(from, to, app.mapCollisionBody);
+    app.shared_world->rayTest(from, to, hit);
+    return hit.hasHit() && hit.m_closestHitFraction < 1.0f;
+}
 } // namespace
 
 nx3d::GameMode DeathmatchMode::type() const
@@ -319,7 +355,7 @@ void DeathmatchMode::fireWeapon(ClientApp& app)
         }
     }
 
-    if (hitTargetId != 0)
+    if (hitTargetId != 0 && !mapBlocksShot(app, rayOrigin, rayDir, closestDist))
     {
         app.tcp_client.sendMessage(
                 packet::Room::Player3D::shoot(app.client_api, hitTargetId, 35.0f));

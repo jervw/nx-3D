@@ -70,6 +70,8 @@ public:
     spear::SceneManager scene_manager;
     spear::physics::bullet::World bullet_world;
     std::shared_ptr<btDiscreteDynamicsWorld> shared_world;
+    /// Static triangle-mesh body used to test whether map geometry blocks a shot.
+    btRigidBody* mapCollisionBody = nullptr;
     spear::MovementController movement_controller;
     spear::rendering::vulkan::Renderer renderer;
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
