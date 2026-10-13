@@ -12,6 +12,8 @@ include(../cmake/Nexilis.cmake)
 
 add_subdirectory(../spear/engine spear_engine)
 
+get_target_property(_spear_links spear INTERFACE_LINK_LIBRARIES)
+
 # nixpkgs advertises shaderc_combined through pkg-config but only ships
 # shaderc_shared. Ubuntu ships shaderc_combined, so use it when available.
 find_library(NX3D_SHADERC_COMBINED_LIBRARY NAMES shaderc_combined)
@@ -20,11 +22,21 @@ if(NOT NX3D_SHADERC_COMBINED_LIBRARY)
   if(NOT NX3D_SHADERC_SHARED_LIBRARY)
     message(FATAL_ERROR "Neither shaderc_combined nor shaderc_shared was found")
   endif()
-  get_target_property(_spear_links spear INTERFACE_LINK_LIBRARIES)
   if(_spear_links)
     string(REPLACE "shaderc_combined" "shaderc_shared" _spear_links "${_spear_links}")
-    set_target_properties(spear PROPERTIES INTERFACE_LINK_LIBRARIES "${_spear_links}")
   endif()
+endif()
+
+if(UNIX AND NOT APPLE AND NX3D_SHADERC_COMBINED_LIBRARY AND _spear_links)
+  # Ubuntu ships these as static archives. SPIRV-Tools-opt depends on symbols
+  # in SPIRV-Tools, so the core archive must follow the optimizer archive.
+  string(REPLACE
+    "$<LINK_ONLY:SPIRV-Tools>;$<LINK_ONLY:SPIRV-Tools-opt>"
+    "$<LINK_ONLY:SPIRV-Tools-opt>;$<LINK_ONLY:SPIRV-Tools>"
+    _spear_links "${_spear_links}")
+endif()
+if(_spear_links)
+  set_target_properties(spear PROPERTIES INTERFACE_LINK_LIBRARIES "${_spear_links}")
 endif()
 
 file(GLOB_RECURSE NX3D_CLIENT_SOURCES CONFIGURE_DEPENDS
