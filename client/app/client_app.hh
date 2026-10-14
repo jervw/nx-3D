@@ -44,6 +44,7 @@ inline constexpr uint8_t kSoundGlock = 6;
 inline constexpr uint8_t kSoundUsp = 7;
 inline constexpr uint8_t kSoundDeagle = 8;
 inline constexpr uint8_t kSoundMp5 = 9;
+inline constexpr uint8_t kSoundDefusing = 10;
 inline constexpr uint8_t shotSoundForWeapon(const std::string_view type)
 {
     if (type == "m16") return kSoundM16;
@@ -100,6 +101,7 @@ public:
     std::unique_ptr<spear::audio::Sound> hitmarker_audio;
     std::unique_ptr<spear::audio::Sound> reload_audio;
     std::unique_ptr<spear::audio::Sound> planting_audio;
+    std::unique_ptr<spear::audio::Sound> defusing_audio;
     std::unique_ptr<spear::audio::Sound> bomb_beep_audio;
     std::unique_ptr<spear::audio::Sound> explosion_audio;
     std::unique_ptr<spear::audio::Sound> smoke_audio;

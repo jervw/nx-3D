@@ -105,6 +105,11 @@ void GameMode::updateRemoteAudioEvents(ClientApp& app)
             if (app.planting_audio)
                 app.planting_audio->playAt(pos);
         }
+        else if (evt.sound == audio::kSoundDefusing)
+        {
+            if (app.defusing_audio)
+                app.defusing_audio->playAt(pos);
+        }
     }
 }
 

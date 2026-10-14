@@ -104,6 +104,9 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
             audio_system, nx3d::projectAssetPath("sounds/reload.wav"));
     planting_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/planting.wav"));
+    defusing_audio = std::make_unique<spear::audio::Sound>(
+            audio_system, nx3d::projectAssetPath("sounds/defusing.wav"));
+    defusing_audio->setSpatialRange(900.0f, 2500.0f);
     bomb_beep_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/bomb_beep.wav"));
     bomb_beep_audio->setSpatialRange(900.0f, 2500.0f);
@@ -347,6 +350,8 @@ void ClientApp::applyAudioVolume()
         reload_audio->setVolume(audioVolume);
     if (planting_audio)
         planting_audio->setVolume(audioVolume);
+    if (defusing_audio)
+        defusing_audio->setVolume(0.45f * audioVolume);
     if (bomb_beep_audio)
         bomb_beep_audio->setVolume(0.6f * std::sqrt(audioVolume));
     if (explosion_audio)

@@ -1,7 +1,7 @@
 """Generate the original nx-3D gameplay sound effects.
 
 Run from any directory: python3 assets/sounds/generate.py
-Writes five utility clips and six distinct weapon shots next to this script.
+Writes utility clips and six distinct weapon shots next to this script.
 """
 
 from __future__ import annotations
@@ -52,6 +52,21 @@ def planting() -> list[float]:
         result[base + offset] += 0.32 * envelope * math.sin(
             2.0 * math.pi * (650.0 * t + 550.0 * t * t)
         )
+    return result
+
+
+def defusing() -> list[float]:
+    """A short sequence of keypad clicks and muted electronic confirmation tones."""
+    rng = random.Random(515)
+    result = [0.0] * int(0.62 * RATE)
+    for start, frequency in ((0.02, 720), (0.22, 890), (0.43, 760)):
+        base = int(start * RATE)
+        for offset in range(int(0.14 * RATE)):
+            t = offset / RATE
+            click = rng.uniform(-1.0, 1.0) * math.exp(-t * 105.0)
+            tone = math.sin(2.0 * math.pi * frequency * t) * \
+                   (1.0 - math.exp(-t * 150.0)) * math.exp(-t * 29.0)
+            result[base + offset] += 0.19 * click + 0.27 * tone
     return result
 
 
@@ -168,6 +183,7 @@ def smoke() -> list[float]:
 
 if __name__ == "__main__":
     save("planting.wav", planting())
+    save("defusing.wav", defusing())
     save("bomb_beep.wav", bomb_beep())
     save("explosion.wav", explosion())
     save("reload.wav", reload())

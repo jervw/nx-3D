@@ -2,6 +2,8 @@
 
 #include <client/app/client_app.hh>
 #include <client/gamemode/bomb_player_state.hh>
+#include <shared/bomb_sites.hh>
+#include <client/project_root.hh>
 
 #include <nexilis/client/packet.hh>
 
@@ -31,6 +33,11 @@ bool BombMode::isEliminated() const
 void BombMode::onEnter(ClientApp& app, const std::string& team)
 {
     DeathmatchMode::onEnter(app, team);
+    m_using = false;
+    m_defusing = false;
+    m_defuseSoundTimer = 0.0f;
+    if (app.defusing_audio)
+        app.defusing_audio->stop();
     app.ui->roundText.setString("WAITING FOR MATCH");
     app.ui->matchStatusText.setString("Queued for next round");
     app.ui->bombText.setString("");
@@ -71,24 +78,25 @@ void BombMode::update(ClientApp& app, float dt)
             app.planting_audio->stop();
         if (m_planted)
         {
-            if (!m_bombCube)
+            if (!m_bombModel)
             {
-                m_bombCube = std::make_shared<spear::rendering::vulkan::TexturedCube>(
+                m_bombModel = std::make_shared<spear::rendering::vulkan::OBJModel>(
                         app.renderer.getDevice(), app.renderer.getPhysicalDevice(),
-                        app.crosshair_texture, app.descriptorPool, app.descriptorSetLayout,
+                        app.renderer.getCommandPool(), app.renderer.getGraphicsQueue(),
+                        nx3d::projectAssetPath("bomb/c4.obj"),
+                        nx3d::projectAssetPath("bomb/c4.mtl"),
+                        app.descriptorPool, app.descriptorSetLayout,
                         blt::ObjectData(app.shared_world, 0.0f,
-                                        glm::vec3(event.bomb_x, event.bomb_y, event.bomb_z),
-                                        app.default_size),
-                        glm::vec4(1.0f, 0.15f, 0.05f, 1.0f));
-                m_bombCube->scale(glm::vec3(20.0f));
-                app.scene_manager.getCurrentScene()->addObject(m_bombCube);
+                                        glm::vec3(event.bomb_x, event.bomb_y - 64.0f, event.bomb_z),
+                                        app.default_size));
+                app.scene_manager.getCurrentScene()->addObject(m_bombModel);
             }
-            m_bombCube->setPosition({event.bomb_x, event.bomb_y, event.bomb_z});
+            m_bombModel->setPosition({event.bomb_x, event.bomb_y - 64.0f, event.bomb_z});
         }
-        else if (m_bombCube)
+        else if (m_bombModel)
         {
-            app.scene_manager.getCurrentScene()->removeObject(m_bombCube->getId());
-            app.pendingDestroy[(app.frameCount - 1) % 3].push_back(std::move(m_bombCube));
+            app.scene_manager.getCurrentScene()->removeObject(m_bombModel->getId());
+            app.pendingDestroy[(app.frameCount - 1) % 3].push_back(std::move(m_bombModel));
         }
         if (!m_alive)
             m_triggerHeld = false;
@@ -109,6 +117,34 @@ void BombMode::update(ClientApp& app, float dt)
             }
             m_weaponPickedUp = true;
             equipWeaponForTeam(app);
+        }
+    }
+
+    if (m_defusing)
+    {
+        const glm::vec3 offset = app.camera.getPosition() - m_bombPosition;
+        const bool inRange = glm::dot(offset, offset) <= 120.0f * 120.0f;
+        if (!m_planted || !m_alive || m_phase != "live" || !inRange)
+        {
+            app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::matchAction(app.client_api, 0));
+            if (app.defusing_audio)
+                app.defusing_audio->stop();
+            m_defusing = false;
+            m_using = false;
+            m_defuseSoundTimer = 0.0f;
+        }
+        else
+        {
+            m_defuseSoundTimer -= dt;
+            if (m_defuseSoundTimer <= 0.0f)
+            {
+                if (app.defusing_audio)
+                    app.defusing_audio->play();
+                app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::audioEvent(
+                        app.client_api, audio::kSoundDefusing,
+                        nexilis::Vector3f({m_bombPosition.x, m_bombPosition.y, m_bombPosition.z})));
+                m_defuseSoundTimer = 0.7f;
+            }
         }
     }
 
@@ -141,7 +177,13 @@ void BombMode::update(ClientApp& app, float dt)
                                       (app.economyState.hasDefuseKit ? "Hold E near bomb to defuse (kit: 2.5s)"
                                                                      : "Hold E near bomb to defuse (5s)")
                                       : "Defend the bomb")
-                           : (m_team == "Terrorist" ? "Hold E to plant bomb" : "Stop the plant");
+                           : (m_team == "Terrorist" ?
+                                      (nx3d::bomb_sites::at(app.camera.getPosition().x,
+                                                           app.camera.getPosition().y,
+                                                           app.camera.getPosition().z)
+                                               ? "Hold E to plant bomb"
+                                               : "Plant at bombsite A or B")
+                                      : "Stop the plant");
     if (app.ui->matchStatusText.getString() != status)
         app.ui->matchStatusText.setString(status);
     const std::string bombText = m_planted ? "[■] BOMB" : "";
@@ -160,16 +202,19 @@ void BombMode::handleKeyDown(ClientApp& app, const SDL_Event& event)
     if (event.key.key == SDLK_E && !event.key.repeat && m_active && m_alive && m_phase == "live")
     {
         const uint8_t action = m_planted ? 2 : 1;
-        if ((action == 1 && m_team == "Terrorist") ||
+        const auto pos = app.camera.getPosition();
+        if ((action == 1 && m_team == "Terrorist" &&
+             nx3d::bomb_sites::at(pos.x, pos.y, pos.z)) ||
             (action == 2 && m_team == "Counter Terrorist"))
         {
             app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::matchAction(app.client_api, action));
             m_using = true;
+            m_defusing = action == 2;
+            m_defuseSoundTimer = 0.0f;
             if (action == 1)
             {
                 if (app.planting_audio)
                     app.planting_audio->play();
-                const glm::vec3 pos = app.camera.getPosition();
                 app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::audioEvent(
                         app.client_api, audio::kSoundPlanting,
                         nexilis::Vector3f({pos.x, pos.y, pos.z})));
@@ -189,6 +234,10 @@ void BombMode::handleKeyUp(ClientApp& app, const SDL_Event& event)
         app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::matchAction(app.client_api, 0));
         if (app.planting_audio)
             app.planting_audio->stop();
+        if (m_defusing && app.defusing_audio)
+            app.defusing_audio->stop();
+        m_defusing = false;
+        m_defuseSoundTimer = 0.0f;
         m_using = false;
     }
     DeathmatchMode::handleKeyUp(app, event);

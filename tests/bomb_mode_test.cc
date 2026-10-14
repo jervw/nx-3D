@@ -1,5 +1,6 @@
 #include <server/gamemode/game_mode_registry.hh>
 #include <shared/economy.hh>
+#include <shared/bomb_sites.hh>
 
 #include <nexilis/client/client_api.hh>
 #include <nexilis/command_type.hh>
@@ -105,16 +106,31 @@ int main()
     check(room->getPlayerHealth(20) == 100.0f, "Smoke damaged a player");
     ctUser->getObject3D().setPosition(Vector3f{0.0f, 0.0f, 0.0f});
     tUser->getObject3D().setPosition(Vector3f{0.0f, 0.0f, 0.0f});
+    check(nx3d::bomb_sites::at(1152.0f, 160.0f, -2416.0f) &&
+                  nx3d::bomb_sites::at(-1600.0f, 64.0f, -2700.0f) &&
+                  !nx3d::bomb_sites::at(0.0f, 0.0f, 0.0f),
+          "Bombsite bounds do not contain both map site markers");
 
     add(30, queued, "Terrorist");
     check(!room->canDamage(30, 20), "Queued player could shoot");
     auto queueEvents = queued.consumeMatchEvents();
     check(bomb(queueEvents).queue_position == 1, "Queue position missing");
 
-    check(room->onPlayerAction(10, 1), "Plant rejected");
+    check(!room->onPlayerAction(10, 1), "Plant outside a bombsite was accepted");
+    tUser->getObject3D().setPosition(Vector3f{1152.0f, 160.0f, -2416.0f});
+    check(room->onPlayerAction(10, 1), "Plant at A was rejected");
+    GameModeRegistry::update(1.5f);
+    tUser->getObject3D().setPosition(Vector3f{0.0f, 0.0f, 0.0f});
+    GameModeRegistry::update(1.7f);
+    auto interrupted = t.consumeMatchEvents();
+    check(!bomb(interrupted).bomb_planted, "Plant continued after leaving A");
+    tUser->getObject3D().setPosition(Vector3f{1152.0f, 160.0f, -2416.0f});
+    check(room->onPlayerAction(10, 1), "Plant restart at A was rejected");
     GameModeRegistry::update(3.1f);
     auto planted = t.consumeMatchEvents();
-    check(bomb(planted).bomb_planted, "Bomb did not plant");
+    check(bomb(planted).bomb_planted && bomb(planted).bomb_x == 1152.0f,
+          "Bomb did not plant at A");
+    ctUser->getObject3D().setPosition(Vector3f{1152.0f, 160.0f, -2416.0f});
     check(room->onPlayerAction(20, 2), "Defuse rejected");
     GameModeRegistry::update(2.6f);
     auto defused = ct.consumeMatchEvents();
@@ -149,7 +165,9 @@ int main()
           "Half-time score was not carried to new sides");
     check(room->canSelectTeam(10), "Active player could not switch team");
 
-    check(room->onPlayerAction(20, 1), "Second-half plant rejected");
+    auto* secondT = server::ClientStorage::getClientById(20);
+    secondT->getObject3D().setPosition(Vector3f{-1600.0f, 64.0f, -2700.0f});
+    check(room->onPlayerAction(20, 1), "Second-half plant at B rejected");
     GameModeRegistry::update(3.1f);
     GameModeRegistry::update(40.1f);
     auto exploded = t.consumeMatchEvents();

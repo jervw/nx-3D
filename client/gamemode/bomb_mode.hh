@@ -26,6 +26,8 @@ private:
     bool m_alive = false;
     bool m_planted = false;
     bool m_using = false;
+    bool m_defusing = false;
+    float m_defuseSoundTimer = 0.0f;
     float m_beepTimer = 0.0f;
     glm::vec3 m_bombPosition{0.0f};
     float m_seconds = 0.0f;
@@ -35,7 +37,7 @@ private:
     uint64_t m_queuePosition = 0;
     std::string m_phase = "waiting";
     std::string m_notice;
-    std::shared_ptr<spear::rendering::vulkan::TexturedCube> m_bombCube;
+    std::shared_ptr<spear::rendering::vulkan::OBJModel> m_bombModel;
 };
 } // namespace nx3d::client::gamemode
 #endif

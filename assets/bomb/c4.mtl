@@ -1,0 +1,72 @@
+# Original material palette with 1-pixel diffuse swatches
+newmtl c4_case
+Ka 0.034 0.038 0.037
+Kd 0.075 0.084 0.082
+map_Kd c4_case.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_charge
+Ka 0.126 0.135 0.122
+Kd 0.280 0.300 0.270
+map_Kd c4_charge.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_edge
+Ka 0.086 0.095 0.090
+Kd 0.190 0.210 0.200
+map_Kd c4_edge.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_key
+Ka 0.194 0.207 0.194
+Kd 0.430 0.460 0.430
+map_Kd c4_key.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_red
+Ka 0.396 0.032 0.016
+Kd 0.880 0.070 0.035
+map_Kd c4_red.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_screen
+Ka 0.113 0.310 0.189
+Kd 0.250 0.690 0.420
+map_Kd c4_screen.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_strap
+Ka 0.011 0.013 0.013
+Kd 0.025 0.030 0.030
+map_Kd c4_strap.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_wire
+Ka 0.293 0.036 0.020
+Kd 0.650 0.080 0.045
+map_Kd c4_wire.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2
+
+newmtl c4_yellow
+Ka 0.378 0.248 0.027
+Kd 0.840 0.550 0.060
+map_Kd c4_yellow.png
+Ks 0.18 0.18 0.18
+Ns 32
+illum 2

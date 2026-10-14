@@ -43,6 +43,7 @@ private:
     void reconcile(nexilis::server::Room& room);
     bool teamAlive(nexilis::server::Room& room, const std::string& team) const;
     bool closeToBomb(uint64_t playerId) const;
+    bool inBombSite(uint64_t playerId) const;
     void clearAction();
 
     mutable std::mutex m_mutex;

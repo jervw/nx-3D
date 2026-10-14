@@ -1,4 +1,5 @@
 #include <server/gamemode/bomb_mode.hh>
+#include <shared/bomb_sites.hh>
 
 #include <nexilis/command_type.hh>
 #include <nexilis/room_command_type.hh>
@@ -116,6 +117,15 @@ bool BombMode::closeToBomb(uint64_t playerId) const
     return dx * dx + dy * dy + dz * dz <= kDefuseRange * kDefuseRange;
 }
 
+bool BombMode::inBombSite(uint64_t playerId) const
+{
+    auto* user = nexilis::server::ClientStorage::getClientById(playerId);
+    if (!user)
+        return false;
+    const auto pos = user->getObject3D().getPosition();
+    return nx3d::bomb_sites::at(pos.x, pos.y, pos.z) != nullptr;
+}
+
 bool BombMode::onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t action)
 {
     std::lock_guard lock(m_mutex);
@@ -138,7 +148,7 @@ bool BombMode::onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t 
     if (m_phase != Phase::live || !m_alive.contains(playerId))
         return false;
     const auto team = room.getPlayerTeam(playerId);
-    if ((action == 1 && (!m_planted && team == kT)) ||
+    if ((action == 1 && !m_planted && team == kT && inBombSite(playerId)) ||
         (action == 2 && m_planted && team == kCT && closeToBomb(playerId)))
     {
         if (m_actionPlayer != playerId || m_action != action)
@@ -307,7 +317,8 @@ void BombMode::update(nexilis::server::Room& room, float dt)
         m_seconds -= dt;
         if (m_actionPlayer && m_alive.contains(m_actionPlayer))
         {
-            if (m_action == 2 && !closeToBomb(m_actionPlayer))
+            if ((m_action == 1 && !inBombSite(m_actionPlayer)) ||
+                (m_action == 2 && !closeToBomb(m_actionPlayer)))
                 clearAction();
             else
             {
