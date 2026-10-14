@@ -71,7 +71,8 @@ public:
         TeamSelect,
         Game,
         Buy,
-        Paused
+        Paused,
+        Settings
     };
 
     ClientApp(const std::string& initialServerAddress, const std::string& initialUsername, bool connectOnStart);
@@ -167,6 +168,15 @@ public:
     bool quitHovered = false;
     bool ctTeamHovered = false;
     bool tTeamHovered = false;
+    bool settingsHovered = false;
+    int settingsRow = 0;
+    int resolutionIndex = 0;
+    bool fullscreen = false;
+    int fpsCapIndex = 2;
+    int graphicsDetail = 2;
+    bool showFps = false;
+    float fpsDisplayTimer = 0.0f;
+    int fpsDisplayFrames = 0;
     nx3d::economy::Snapshot economyState;
     ui::Ui::BuyStyle buyStyle = ui::Ui::BuyStyle::List;
     std::string buyNotice;
@@ -257,9 +267,14 @@ public:
     void animatePlayerRespawn(uint64_t playerId);
     void applyAudioVolume();
     void changeVolume(float delta);
-    void setVolumeNormalized(float normalized);
     void pauseGame();
     void resumeGame();
+    void openSettings();
+    void closeSettings();
+    void changeSetting(int row, int direction);
+    void refreshSettings();
+    void loadSettings();
+    void saveSettings() const;
     void openBuyMenu();
     void closeBuyMenu();
     void cleanQuit();

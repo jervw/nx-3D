@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <thread>
 
@@ -31,6 +32,22 @@ namespace nx3d::client
 
 namespace blt = spear::physics::bullet;
 namespace vk = spear::rendering::vulkan;
+
+namespace
+{
+constexpr std::array<spear::BaseWindow::Size, 4> kResolutions{{
+        {820, 640}, {1280, 720}, {1600, 900}, {1920, 1080}}};
+constexpr std::array<int, 6> kFpsCaps{{0, 30, 60, 120, 144, 240}};
+
+std::string settingsPath()
+{
+    char* prefPath = SDL_GetPrefPath("nx3d", "nx-3D");
+    if (!prefPath) return {};
+    std::string path = std::string(prefPath) + "settings.txt";
+    SDL_free(prefPath);
+    return path;
+}
+}
 
 ClientApp::ClientApp(const std::string& initialServerAddress, const std::string& initialUsername, bool connectOnStart)
     : window("nx_3D game", spear::BaseWindow::Size{820, 640}),
@@ -126,6 +143,8 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
             renderer.getDevice(), renderer.getPhysicalDevice(),
             renderer.getCommandPool(), renderer.getGraphicsQueue(),
             descriptorPool, descriptorSetLayout, fontPath);
+
+    loadSettings();
 
     renderer.setUIRenderer(&ui->renderer());
 
@@ -340,7 +359,6 @@ void ClientApp::changeVolume(float delta)
 {
     audioVolume = std::clamp(audioVolume + delta, 0.0f, 1.0f);
     applyAudioVolume();
-    ui->updateVolumeDisplay(audioVolume);
 }
 
 void ClientApp::applyAudioVolume()
@@ -374,13 +392,6 @@ spear::audio::Sound* ClientApp::gunshotSound(uint8_t sound)
     return gunshot_audio[sound - audio::kSoundAk47].get();
 }
 
-void ClientApp::setVolumeNormalized(float normalized)
-{
-    normalized = std::clamp(normalized, 0.0f, 1.0f);
-    float snapped = std::round(normalized * 20.0f) / 20.0f;
-    changeVolume(snapped - audioVolume);
-}
-
 void ClientApp::pauseGame()
 {
     if (currentState == State::Game)
@@ -390,14 +401,15 @@ void ClientApp::pauseGame()
         quitHovered = false;
         ctTeamHovered = false;
         tTeamHovered = false;
+        settingsHovered = false;
         SDL_SetWindowRelativeMouseMode(window.getSDLWindow(), false);
         ui->pauseTitle.setString("PAUSED");
         ui->pauseTeamTitle.setString("CHANGE TEAM");
         ui->pauseCTText.setString("COUNTER TERRORIST");
         ui->pauseTText.setString("TERRORIST");
         ui->pauseQuitText.setString("[ QUIT GAME ]");
-        ui->pauseInstructions.setString("ESC: Resume | Click team | L/R: Volume | Enter: Quit");
-        changeVolume(0.0f);
+        ui->pauseSettingsText.setString("[ SETTINGS ]");
+        ui->pauseInstructions.setString("ESC: Resume   |   Click a button");
     }
 }
 
@@ -409,15 +421,137 @@ void ClientApp::resumeGame()
         quitHovered = false;
         ctTeamHovered = false;
         tTeamHovered = false;
+        settingsHovered = false;
         SDL_SetWindowRelativeMouseMode(window.getSDLWindow(), true);
         ui->pauseTitle.setString("");
         ui->pauseTeamTitle.setString("");
         ui->pauseCTText.setString("");
         ui->pauseTText.setString("");
-        ui->pauseVolumeText.setString("");
         ui->pauseQuitText.setString("");
+        ui->pauseSettingsText.setString("");
         ui->pauseInstructions.setString("");
     }
+}
+
+void ClientApp::openSettings()
+{
+    if (currentState != State::Paused) return;
+    currentState = State::Settings;
+    ui->pauseTitle.setString("");
+    ui->pauseTeamTitle.setString("");
+    ui->pauseCTText.setString("");
+    ui->pauseTText.setString("");
+    ui->pauseSettingsText.setString("");
+    ui->pauseQuitText.setString("");
+    ui->pauseInstructions.setString("");
+    refreshSettings();
+}
+
+void ClientApp::closeSettings()
+{
+    if (currentState != State::Settings) return;
+    ui->hideSettings();
+    currentState = State::Paused;
+    ui->pauseTitle.setString("PAUSED");
+    ui->pauseTeamTitle.setString("CHANGE TEAM");
+    ui->pauseCTText.setString("COUNTER TERRORIST");
+    ui->pauseTText.setString("TERRORIST");
+    ui->pauseSettingsText.setString("[ SETTINGS ]");
+    ui->pauseQuitText.setString("[ QUIT GAME ]");
+    ui->pauseInstructions.setString("ESC: Resume   |   Click a button");
+}
+
+void ClientApp::refreshSettings()
+{
+    const auto& resolution = kResolutions[resolutionIndex];
+    const int cap = kFpsCaps[fpsCapIndex];
+    ui->showSettings({{
+            std::to_string(resolution.x) + " x " + std::to_string(resolution.y),
+            fullscreen ? "Fullscreen" : "Windowed",
+            std::to_string(static_cast<int>(camera.getFov())),
+            std::to_string(static_cast<int>(std::lround(audioVolume * 100.0f))) + "%",
+            cap ? std::to_string(cap) : "Unlimited",
+            graphicsDetail == 0 ? "Low" : graphicsDetail == 1 ? "Medium" : "High",
+            std::to_string(static_cast<int>(std::lround(camera.getMouseSensitivity() * 100.0f))) + "%",
+            showFps ? "On" : "Off"
+    }}, settingsRow);
+}
+
+void ClientApp::changeSetting(int row, int direction)
+{
+    if (direction == 0) return;
+    switch (row)
+    {
+    case 0:
+    {
+        const int next = std::clamp(resolutionIndex + direction, 0, static_cast<int>(kResolutions.size()) - 1);
+        if (next != resolutionIndex)
+        {
+            const auto& size = kResolutions[next];
+            if (SDL_SetWindowSize(window.getSDLWindow(), size.x, size.y))
+            {
+                resolutionIndex = next;
+                window.resize();
+                renderer.setViewPort(size.x, size.y);
+            }
+        }
+        break;
+    }
+    case 1:
+        if (SDL_SetWindowFullscreen(window.getSDLWindow(), !fullscreen))
+        {
+            fullscreen = !fullscreen;
+            window.resize();
+        }
+        break;
+    case 2: camera.setFov(camera.getFov() + direction * 5.0f); break;
+    case 3: changeVolume(direction * 0.05f); break;
+    case 4: fpsCapIndex = std::clamp(fpsCapIndex + direction, 0, static_cast<int>(kFpsCaps.size()) - 1); break;
+    case 5: graphicsDetail = std::clamp(graphicsDetail + direction, 0, 2); break;
+    case 6: camera.setMouseSensitivity(camera.getMouseSensitivity() + direction * 0.02f); break;
+    case 7:
+        showFps = !showFps;
+        if (!showFps) ui->fpsText.setString("");
+        break;
+    default: break;
+    }
+    refreshSettings();
+    saveSettings();
+}
+
+void ClientApp::loadSettings()
+{
+    const std::string path = settingsPath();
+    if (path.empty()) return;
+    std::ifstream file(path);
+    int resolution = 0, full = 0, cap = 2, detail = 2, fps = 0;
+    float fov = 45.0f, volume = 0.1f, sensitivity = 0.1f;
+    if (!(file >> resolution >> full >> fov >> volume >> cap >> detail >> sensitivity >> fps))
+        return;
+    resolutionIndex = std::clamp(resolution, 0, static_cast<int>(kResolutions.size()) - 1);
+    fpsCapIndex = std::clamp(cap, 0, static_cast<int>(kFpsCaps.size()) - 1);
+    graphicsDetail = std::clamp(detail, 0, 2);
+    showFps = fps != 0;
+    camera.setFov(fov);
+    camera.setMouseSensitivity(sensitivity);
+    audioVolume = std::clamp(volume, 0.0f, 1.0f);
+    applyAudioVolume();
+    const auto& size = kResolutions[resolutionIndex];
+    SDL_SetWindowSize(window.getSDLWindow(), size.x, size.y);
+    fullscreen = full != 0 && SDL_SetWindowFullscreen(window.getSDLWindow(), true);
+    window.resize();
+}
+
+void ClientApp::saveSettings() const
+{
+    const std::string path = settingsPath();
+    if (path.empty()) return;
+    std::ofstream file(path);
+    if (!file) return;
+    file << resolutionIndex << ' ' << (fullscreen ? 1 : 0) << ' '
+         << camera.getFov() << ' ' << audioVolume << ' ' << fpsCapIndex << ' '
+         << graphicsDetail << ' ' << camera.getMouseSensitivity() << ' '
+         << (showFps ? 1 : 0) << '\n';
 }
 
 void ClientApp::openBuyMenu()
@@ -639,11 +773,24 @@ void ClientApp::run()
 
     while (true)
     {
+        const Uint64 frameStart = SDL_GetTicksNS();
         pendingDestroy[frameCount % 3].clear();
         frameCount++;
 
         float delta_time = time_interface.getDeltaTime();
         time_interface.updateFromMain(delta_time);
+        if (showFps && (currentState == State::Game || currentState == State::Buy))
+        {
+            fpsDisplayTimer += delta_time;
+            ++fpsDisplayFrames;
+            if (fpsDisplayTimer >= 0.5f)
+            {
+                ui->fpsText.setString("FPS: " + std::to_string(
+                        static_cast<int>(std::lround(fpsDisplayFrames / fpsDisplayTimer))));
+                fpsDisplayTimer = 0.0f;
+                fpsDisplayFrames = 0;
+            }
+        }
 
         // Recycle finished gunshot sounds.
         audio_system.update();
@@ -878,18 +1025,12 @@ void ClientApp::run()
                     {
                         resumeGame();
                     }
-                    else if (event.key.key == SDLK_LEFT)
-                    {
-                        changeVolume(-0.05f);
-                    }
-                    else if (event.key.key == SDLK_RIGHT)
-                    {
-                        changeVolume(0.05f);
-                    }
-                    else if (event.key.key == SDLK_RETURN)
-                    {
-                        cleanQuit();
-                    }
+                }
+                if (event.type == SDL_EVENT_WINDOW_RESIZED)
+                {
+                    window.resize();
+                    auto size = window.getSize();
+                    renderer.setViewPort(size.x, size.y);
                 }
                 if (event.type == SDL_EVENT_MOUSE_MOTION)
                 {
@@ -898,13 +1039,9 @@ void ClientApp::run()
                     float mx = (static_cast<float>(event.motion.x) / static_cast<float>(live_w ? live_w : 1)) * 2.0f - 1.0f;
                     float my = 1.0f - (static_cast<float>(event.motion.y) / static_cast<float>(live_h ? live_h : 1)) * 2.0f;
                     quitHovered = (mx >= -0.42f && mx <= 0.42f && my >= -0.37f && my <= -0.25f);
+                    settingsHovered = (mx >= -0.42f && mx <= 0.42f && my >= -0.17f && my <= -0.05f);
                     ctTeamHovered = (mx >= -0.44f && mx <= -0.02f && my >= 0.10f && my <= 0.23f);
                     tTeamHovered = (mx >= 0.02f && mx <= 0.44f && my >= 0.10f && my <= 0.23f);
-                    if ((event.motion.state & SDL_BUTTON_LMASK) &&
-                        mx >= -0.45f && mx <= 0.45f && my >= -0.20f && my <= -0.05f)
-                    {
-                        setVolumeNormalized((mx + 0.45f) / 0.9f);
-                    }
                 }
                 if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT)
                 {
@@ -924,13 +1061,70 @@ void ClientApp::run()
                         resumeGame();
                         break;
                     }
-                    if (mx >= -0.45f && mx <= 0.45f && my >= -0.20f && my <= -0.05f)
+                    if (mx >= -0.42f && mx <= 0.42f && my >= -0.17f && my <= -0.05f)
                     {
-                        setVolumeNormalized((mx + 0.45f) / 0.9f);
+                        openSettings();
+                        break;
                     }
                     else if (mx >= -0.42f && mx <= 0.42f && my >= -0.37f && my <= -0.25f)
                     {
                         cleanQuit();
+                    }
+                }
+            }
+        }
+        else if (currentState == State::Settings)
+        {
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+            {
+                if (event.type == SDL_EVENT_QUIT)
+                    cleanQuit();
+                else if (event.type == SDL_EVENT_WINDOW_RESIZED)
+                {
+                    window.resize();
+                    auto size = window.getSize();
+                    renderer.setViewPort(size.x, size.y);
+                }
+                else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat)
+                {
+                    if (event.key.key == SDLK_ESCAPE || event.key.key == SDLK_BACKSPACE)
+                    {
+                        closeSettings();
+                        break;
+                    }
+                    if (event.key.key == SDLK_UP)
+                        settingsRow = (settingsRow + 7) % 8;
+                    else if (event.key.key == SDLK_DOWN)
+                        settingsRow = (settingsRow + 1) % 8;
+                    else if (event.key.key == SDLK_LEFT)
+                        changeSetting(settingsRow, -1);
+                    else if (event.key.key == SDLK_RIGHT || event.key.key == SDLK_RETURN)
+                        changeSetting(settingsRow, 1);
+                    refreshSettings();
+                }
+                else if (event.type == SDL_EVENT_MOUSE_MOTION ||
+                         (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.button.button == SDL_BUTTON_LEFT))
+                {
+                    int width = 0, height = 0;
+                    SDL_GetWindowSize(window.getSDLWindow(), &width, &height);
+                    const float px = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.x : event.button.x;
+                    const float py = event.type == SDL_EVENT_MOUSE_MOTION ? event.motion.y : event.button.y;
+                    const float x = px / static_cast<float>(width ? width : 1) * 2.0f - 1.0f;
+                    const float y = 1.0f - py / static_cast<float>(height ? height : 1) * 2.0f;
+                    const int row = ui->settingsRowAt(x, y);
+                    if (row >= 0)
+                    {
+                        settingsRow = row;
+                        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+                            changeSetting(row, ui->settingsDirectionAt(x));
+                        refreshSettings();
+                    }
+                    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+                        x >= -0.30f && x <= 0.30f && y >= -0.64f && y <= -0.52f)
+                    {
+                        closeSettings();
+                        break;
                     }
                 }
             }
@@ -1032,7 +1226,8 @@ void ClientApp::run()
         // Pausing stops player input, but an airborne player still needs
         // gravity and ground detection so they do not remain suspended until
         // the game is resumed.
-        if ((currentState == State::Paused || currentState == State::Buy) &&
+        if ((currentState == State::Paused || currentState == State::Settings ||
+             currentState == State::Buy) &&
             !movement_controller.isOnGround())
         {
             static const std::unordered_map<SDL_Keycode, bool> noMovementKeys = {
@@ -1040,6 +1235,10 @@ void ClientApp::run()
                     {SDLK_D, false}, {SDLK_SPACE, false}};
             movement_controller.processInput(noMovementKeys, delta_time);
         }
+
+        const auto size = window.getSize();
+        if (size.x > 0 && size.y > 0)
+            camera.setAspectRatio(static_cast<float>(size.x) / static_cast<float>(size.y));
 
         // --- Render ---
         renderer.render();
@@ -1147,7 +1346,14 @@ void ClientApp::run()
         }
 
         window.update();
-        time_interface.delay(16);
+        const int fpsCap = kFpsCaps[fpsCapIndex];
+        if (fpsCap > 0)
+        {
+            const Uint64 elapsed = SDL_GetTicksNS() - frameStart;
+            const Uint64 target = 1000000000ULL / static_cast<Uint64>(fpsCap);
+            if (elapsed < target)
+                SDL_DelayPrecise(target - elapsed);
+        }
     }
 }
 

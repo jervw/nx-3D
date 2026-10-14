@@ -56,11 +56,6 @@ Ui::Ui(VkDevice device,
                       descriptorPool, descriptorSetLayout, fontPath, 32),
       teamSelectInstructions(device, physDevice, commandPool, graphicsQueue,
                              descriptorPool, descriptorSetLayout, fontPath, 16),
-      hudCTRosterHeader(device, physDevice, commandPool, graphicsQueue,
-                        descriptorPool, descriptorSetLayout, fontPath, 16),
-      hudTRosterHeader(device, physDevice, commandPool, graphicsQueue,
-                       descriptorPool, descriptorSetLayout, fontPath, 16),
-
       healthText(device, physDevice, commandPool, graphicsQueue,
                  descriptorPool, descriptorSetLayout, fontPath, 24),
       weaponHudText(device, physDevice, commandPool, graphicsQueue,
@@ -79,6 +74,8 @@ Ui::Ui(VkDevice device,
                descriptorPool, descriptorSetLayout, fontPath, 20),
       moneyText(device, physDevice, commandPool, graphicsQueue,
                 descriptorPool, descriptorSetLayout, fontPath, 20),
+      fpsText(device, physDevice, commandPool, graphicsQueue,
+              descriptorPool, descriptorSetLayout, fontPath, 16),
       buyTitleText(device, physDevice, commandPool, graphicsQueue,
                    descriptorPool, descriptorSetLayout, fontPath, 30),
       buyHintText(device, physDevice, commandPool, graphicsQueue,
@@ -94,12 +91,18 @@ Ui::Ui(VkDevice device,
                   descriptorPool, descriptorSetLayout, fontPath, 16),
       pauseTText(device, physDevice, commandPool, graphicsQueue,
                  descriptorPool, descriptorSetLayout, fontPath, 16),
-      pauseVolumeText(device, physDevice, commandPool, graphicsQueue,
-                      descriptorPool, descriptorSetLayout, fontPath, 24),
       pauseQuitText(device, physDevice, commandPool, graphicsQueue,
                     descriptorPool, descriptorSetLayout, fontPath, 28),
+      pauseSettingsText(device, physDevice, commandPool, graphicsQueue,
+                        descriptorPool, descriptorSetLayout, fontPath, 26),
       pauseInstructions(device, physDevice, commandPool, graphicsQueue,
                         descriptorPool, descriptorSetLayout, fontPath, 14),
+      settingsTitle(device, physDevice, commandPool, graphicsQueue,
+                    descriptorPool, descriptorSetLayout, fontPath, 38),
+      settingsHint(device, physDevice, commandPool, graphicsQueue,
+                   descriptorPool, descriptorSetLayout, fontPath, 14),
+      settingsBack(device, physDevice, commandPool, graphicsQueue,
+                   descriptorPool, descriptorSetLayout, fontPath, 20),
 
       leaderboardTitle(device, physDevice, commandPool, graphicsQueue,
                        descriptorPool, descriptorSetLayout, fontPath, 28),
@@ -194,13 +197,6 @@ Ui::Ui(VkDevice device,
     teamSelectInstructions.setColor(SDL_Color{200, 200, 200, 255});
     teamSelectInstructions.setPosition(glm::vec2(-0.25f, 0.25f));
 
-    hudCTRosterHeader.setString("Counter Terrorist");
-    hudCTRosterHeader.setColor(SDL_Color{135, 205, 255, 255});
-    hudCTRosterHeader.setPosition(glm::vec2(0.20f, 0.56f));
-    hudTRosterHeader.setString("Terrorist");
-    hudTRosterHeader.setColor(SDL_Color{255, 190, 115, 255});
-    hudTRosterHeader.setPosition(glm::vec2(0.20f, -0.10f));
-
     // --- In-game HUD ---------------------------------------------------------
     healthText.setString("HP: 100");
     healthText.setColor(SDL_Color{255, 255, 255, 255});
@@ -234,6 +230,9 @@ Ui::Ui(VkDevice device,
     moneyText.setString("$800  |  B: Buy");
     moneyText.setPosition(glm::vec2(0.56f, 0.69f));
     moneyText.setColor(SDL_Color{130, 255, 160, 255});
+    fpsText.setString("");
+    fpsText.setPosition(glm::vec2(-0.98f, 0.94f));
+    fpsText.setColor(SDL_Color{190, 225, 190, 255});
     buyTitleText.setColor(SDL_Color{255, 255, 255, 255});
     buyTitleText.setPosition(glm::vec2(-0.40f, 0.65f));
     buyHintText.setColor(SDL_Color{200, 220, 230, 255});
@@ -258,17 +257,48 @@ Ui::Ui(VkDevice device,
     pauseTText.setColor(SDL_Color{255, 220, 180, 255});
     pauseTText.setPosition(glm::vec2(0.12f, 0.15f));
 
-    pauseVolumeText.setString("");
-    pauseVolumeText.setColor(SDL_Color{255, 200, 0, 255});
-    pauseVolumeText.setPosition(glm::vec2(-0.17f, -0.02f));
-
     pauseQuitText.setString("");
     pauseQuitText.setColor(SDL_Color{255, 255, 255, 255});
     pauseQuitText.setPosition(glm::vec2(-0.22f, -0.33f));
 
+    pauseSettingsText.setString("");
+    pauseSettingsText.setColor(SDL_Color{255, 255, 255, 255});
+    pauseSettingsText.setPosition(glm::vec2(-0.22f, -0.13f));
+
     pauseInstructions.setString("");
     pauseInstructions.setColor(SDL_Color{200, 200, 200, 255});
     pauseInstructions.setPosition(glm::vec2(-0.37f, -0.56f));
+
+    settingsTitle.setString("");
+    settingsTitle.setColor(SDL_Color{255, 255, 255, 255});
+    settingsTitle.setPosition(glm::vec2(-0.23f, 0.64f));
+    settingsHint.setString("");
+    settingsHint.setColor(SDL_Color{195, 205, 220, 255});
+    settingsHint.setPosition(glm::vec2(-0.62f, -0.71f));
+    settingsBack.setString("");
+    settingsBack.setColor(SDL_Color{255, 210, 130, 255});
+    settingsBack.setPosition(glm::vec2(-0.17f, -0.59f));
+    for (int i = 0; i < 8; ++i)
+    {
+        auto makeText = [&]
+        {
+            return std::make_unique<spear::ui::vulkan::Text>(
+                device, physDevice, commandPool, graphicsQueue,
+                descriptorPool, descriptorSetLayout, fontPath, 19);
+        };
+        const float y = 0.46f - i * 0.125f;
+        auto addText = [&](auto& texts, float x, SDL_Color color)
+        {
+            auto text = makeText();
+            text->setColor(color);
+            text->setPosition(glm::vec2(x, y));
+            texts.push_back(std::move(text));
+        };
+        addText(settingsRows, -0.60f, SDL_Color{220, 230, 240, 255});
+        addText(settingsValues, 0.13f, SDL_Color{220, 230, 240, 255});
+        addText(settingsLeftArrows, -0.06f, SDL_Color{255, 210, 130, 255});
+        addText(settingsRightArrows, 0.55f, SDL_Color{255, 210, 130, 255});
+    }
 
     buildPauseMenu();
     buildDeathOverlay();
@@ -335,23 +365,6 @@ void Ui::buildPauseMenu()
     m_pausePanel->setPosition(glm::vec2(-0.50f, -0.60f));
     m_pausePanel->setSize(glm::vec2(1.0f, 1.32f));
 
-    m_pauseSliderTrack = std::make_shared<spear::ui::vulkan::Quad2D>(
-            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
-            makeSolidTexture(90, 90, 100, 255));
-    m_pauseSliderTrack->setPosition(glm::vec2(-0.45f, -0.16f));
-    m_pauseSliderTrack->setSize(glm::vec2(0.9f, 0.07f));
-
-    m_pauseSliderFill = std::make_shared<spear::ui::vulkan::Quad2D>(
-            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
-            makeSolidTexture(255, 150, 0, 255));
-    m_pauseSliderFill->setPosition(glm::vec2(-0.45f, -0.16f));
-    m_pauseSliderFill->setSize(glm::vec2(0.9f, 0.07f));
-
-    m_pauseSliderKnob = std::make_shared<spear::ui::vulkan::Quad2D>(
-            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
-            makeSolidTexture(255, 210, 0, 255));
-    m_pauseSliderKnob->setSize(glm::vec2(0.05f, 0.15f));
-
     m_pauseCTButton = std::make_shared<spear::ui::vulkan::Quad2D>(
             m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
             makeSolidTexture(35, 85, 135, 255));
@@ -387,6 +400,26 @@ void Ui::buildPauseMenu()
             makeSolidTexture(210, 80, 60, 255));
     m_pauseQuitButtonHover->setPosition(glm::vec2(-0.42f, -0.37f));
     m_pauseQuitButtonHover->setSize(glm::vec2(0.84f, 0.12f));
+
+    m_pauseSettingsButton = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(42, 82, 104, 255));
+    m_pauseSettingsButton->setPosition(glm::vec2(-0.42f, -0.17f));
+    m_pauseSettingsButton->setSize(glm::vec2(0.84f, 0.12f));
+    m_pauseSettingsButtonHover = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(66, 132, 165, 255));
+    m_pauseSettingsButtonHover->setPosition(glm::vec2(-0.42f, -0.17f));
+    m_pauseSettingsButtonHover->setSize(glm::vec2(0.84f, 0.12f));
+    m_settingsPanel = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(26, 34, 48, 250));
+    m_settingsPanel->setPosition(glm::vec2(-0.72f, -0.80f));
+    m_settingsPanel->setSize(glm::vec2(1.44f, 1.60f));
+    m_settingsSelection = std::make_shared<spear::ui::vulkan::Quad2D>(
+            m_device, m_physDevice, m_descriptorPool, m_descriptorSetLayout,
+            makeSolidTexture(46, 73, 96, 255));
+    m_settingsSelection->setSize(glm::vec2(1.30f, 0.108f));
 }
 
 void Ui::buildLeaderboard()
@@ -601,7 +634,6 @@ void Ui::showTeamSelectTexts()
 {
     clear();
     m_playerNameplates.clear();
-    m_teamRosterInHud = false;
     registerText(teamSelectTitle);
     registerText(teamSelectInstructions);
     registerText(ctButtonText);
@@ -636,19 +668,17 @@ void Ui::setTeamRoster(const std::vector<LeaderboardEntry>& entries)
         for (std::size_t i = 0; i < players.size() && row < kTeamRosterMaxRows; ++i)
         {
             auto& text = *teamRosterRows[row++];
-            const float x = leftX + (i / 15) * (m_teamRosterInHud ? 0.38f : 0.41f);
-            const float y = startY - (i % 15) * (m_teamRosterInHud ? 0.035f : 0.05f);
+            const float x = leftX + (i / 15) * 0.41f;
+            const float y = startY - (i % 15) * 0.05f;
             text.setPosition(glm::vec2(x, y));
             text.setColor(color);
             if (text.getString() != players[i].username)
                 text.setString(players[i].username);
         }
     };
-    addSide(ct, m_teamRosterInHud ? 0.20f : -0.78f,
-            m_teamRosterInHud ? 0.49f : -0.08f,
+    addSide(ct, -0.78f, -0.08f,
             SDL_Color{135, 205, 255, 255});
-    addSide(t, m_teamRosterInHud ? 0.20f : 0.16f,
-            m_teamRosterInHud ? -0.17f : -0.08f,
+    addSide(t, 0.16f, -0.08f,
             SDL_Color{255, 190, 115, 255});
     for (; row < kTeamRosterMaxRows; ++row)
         if (!teamRosterRows[row]->getString().empty())
@@ -658,13 +688,8 @@ void Ui::setTeamRoster(const std::vector<LeaderboardEntry>& entries)
 void Ui::showGameHudTexts()
 {
     clear();
-    m_teamRosterInHud = true;
     registerText(healthText);
     registerText(serverPlayerCountText);
-    registerText(hudCTRosterHeader);
-    registerText(hudTRosterHeader);
-    for (auto& row : teamRosterRows)
-        registerText(*row);
     registerText(weaponHudText);
     registerText(hitmarkerText);
     registerText(wastedText);
@@ -673,6 +698,7 @@ void Ui::showGameHudTexts()
     registerText(matchStatusText);
     registerText(bombText);
     registerText(moneyText);
+    registerText(fpsText);
     registerText(buyTitleText);
     registerText(buyHintText);
     registerText(buyNoticeText);
@@ -682,9 +708,20 @@ void Ui::showGameHudTexts()
     registerText(pauseTeamTitle);
     registerText(pauseCTText);
     registerText(pauseTText);
-    registerText(pauseVolumeText);
     registerText(pauseQuitText);
+    registerText(pauseSettingsText);
     registerText(pauseInstructions);
+    registerText(settingsTitle);
+    registerText(settingsHint);
+    registerText(settingsBack);
+    for (auto& row : settingsRows)
+        registerText(*row);
+    for (auto& value : settingsValues)
+        registerText(*value);
+    for (auto& arrow : settingsLeftArrows)
+        registerText(*arrow);
+    for (auto& arrow : settingsRightArrows)
+        registerText(*arrow);
 
     registerText(leaderboardTitle);
     registerText(leaderboardTHeader);
@@ -746,7 +783,7 @@ void Ui::showBuyMenu(BuyStyle style, const nx3d::economy::Snapshot& state,
                         style == BuyStyle::Radial ? "BUY  |  RADIAL" : "BUY  |  CS2 GRID";
     buyTitleText.setString(title);
     buyHintText.setString("Click to buy  |  Tab: Change layout  |  B / Esc: Close");
-    buyNoticeText.setString(notice.empty() ? "Balance: $" + std::to_string(state.money) : notice);
+    buyNoticeText.setString(notice);
     constexpr float kPi = 3.14159265358979323846f;
     for (std::size_t i = 0; i < nx3d::economy::kItems.size(); ++i)
     {
@@ -845,7 +882,7 @@ void Ui::renderBuyOverlay(spear::ui::RenderContext ctx)
 }
 
 void Ui::renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
-                            bool ctHovered, bool tHovered)
+                            bool ctHovered, bool tHovered, bool settingsHovered)
 {
     if (m_pauseBackdropQuad)
         m_pauseBackdropQuad->render(ctx);
@@ -867,12 +904,10 @@ void Ui::renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
     }
     else if (m_pauseTButton)
         m_pauseTButton->render(ctx);
-    if (m_pauseSliderTrack)
-        m_pauseSliderTrack->render(ctx);
-    if (m_pauseSliderFill)
-        m_pauseSliderFill->render(ctx);
-    if (m_pauseSliderKnob)
-        m_pauseSliderKnob->render(ctx);
+    if (settingsHovered)
+        m_pauseSettingsButtonHover->render(ctx);
+    else
+        m_pauseSettingsButton->render(ctx);
     if (quitHovered)
     {
         if (m_pauseQuitButtonHover)
@@ -882,6 +917,86 @@ void Ui::renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
     {
         m_pauseQuitButton->render(ctx);
     }
+}
+
+void Ui::renderSettingsOverlay(spear::ui::RenderContext ctx, int selectedRow)
+{
+    m_pauseBackdropQuad->render(ctx);
+    m_settingsPanel->render(ctx);
+    if (selectedRow >= 0 && selectedRow < 8)
+    {
+        m_settingsSelection->setPosition(glm::vec2(-0.65f, 0.43f - selectedRow * 0.125f));
+        m_settingsSelection->render(ctx);
+    }
+}
+
+void Ui::showSettings(const std::array<std::string, 8>& values, int selectedRow)
+{
+    static constexpr std::array<const char*, 8> labels{{
+            "Resolution", "Display mode", "Field of view", "Sound volume",
+            "FPS limit", "Smoke detail", "Mouse sensitivity", "Show FPS"}};
+    if (settingsTitle.getString() != "SETTINGS")
+        settingsTitle.setString("SETTINGS");
+    if (settingsHint.getString() != "UP/DOWN: Select   LEFT/RIGHT: Change   ESC: Back")
+        settingsHint.setString("UP/DOWN: Select   LEFT/RIGHT: Change   ESC: Back");
+    if (settingsBack.getString() != "[ BACK ]")
+        settingsBack.setString("[ BACK ]");
+    for (int i = 0; i < 8; ++i)
+    {
+        if (settingsRows[i]->getString() != labels[i])
+            settingsRows[i]->setString(labels[i]);
+        if (settingsValues[i]->getString() != values[i])
+            settingsValues[i]->setString(values[i]);
+        if (settingsLeftArrows[i]->getString() != "<")
+            settingsLeftArrows[i]->setString("<");
+        if (settingsRightArrows[i]->getString() != ">")
+            settingsRightArrows[i]->setString(">");
+    }
+    if (selectedRow != m_settingsSelectedRow)
+    {
+        if (m_settingsSelectedRow >= 0)
+            settingsRows[m_settingsSelectedRow]->setColor(SDL_Color{220, 230, 240, 255});
+        settingsRows[selectedRow]->setColor(SDL_Color{255, 220, 150, 255});
+        m_settingsSelectedRow = selectedRow;
+    }
+}
+
+void Ui::hideSettings()
+{
+    settingsTitle.setString("");
+    settingsHint.setString("");
+    settingsBack.setString("");
+    for (auto& row : settingsRows)
+        row->setString("");
+    for (auto& value : settingsValues)
+        value->setString("");
+    for (auto& arrow : settingsLeftArrows)
+        arrow->setString("");
+    for (auto& arrow : settingsRightArrows)
+        arrow->setString("");
+    m_settingsSelectedRow = -1;
+}
+
+int Ui::settingsRowAt(float x, float y) const
+{
+    if (x < -0.65f || x > 0.65f)
+        return -1;
+    for (int row = 0; row < 8; ++row)
+    {
+        const float center = 0.46f - row * 0.125f;
+        if (y >= center - 0.06f && y <= center + 0.055f)
+            return row;
+    }
+    return -1;
+}
+
+int Ui::settingsDirectionAt(float x) const
+{
+    if (x >= -0.12f && x <= 0.06f)
+        return -1;
+    if (x >= 0.10f && x <= 0.65f)
+        return 1;
+    return 0;
 }
 
 void Ui::showLeaderboard(const std::vector<LeaderboardEntry>& entries)
@@ -945,17 +1060,6 @@ void Ui::renderLeaderboardOverlay(spear::ui::RenderContext ctx)
         m_leaderboardBackdropQuad->render(ctx);
     if (m_leaderboardPanelQuad)
         m_leaderboardPanelQuad->render(ctx);
-}
-
-void Ui::updateVolumeDisplay(float volume)
-{
-    int percent = static_cast<int>(std::lround(volume * 100.0f));
-    pauseVolumeText.setString("Volume: " + std::to_string(percent) + "%");
-    float fillWidth = 0.9f * volume;
-    if (m_pauseSliderFill)
-        m_pauseSliderFill->setSize(glm::vec2(fillWidth, 0.07f));
-    if (m_pauseSliderKnob)
-        m_pauseSliderKnob->setPosition(glm::vec2(-0.45f + fillWidth - 0.025f, -0.20f));
 }
 
 } // namespace nx3d::client::ui

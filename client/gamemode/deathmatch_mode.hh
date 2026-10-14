@@ -101,6 +101,7 @@ protected:
         glm::vec3 end;
         float age = 0.0f;
         bool smoke = false;
+        std::vector<int> puffSlots;
         std::vector<std::shared_ptr<spear::rendering::vulkan::TexturedCube>> puffs;
     };
     std::vector<GrenadeVisual> m_grenadeVisuals;

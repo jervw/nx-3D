@@ -82,7 +82,6 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
 
     app.ui->hideLeaderboard();
     m_leaderboard.clear();
-    app.ui->setTeamRoster({});
 
     const auto& spawns = (m_team == "Terrorist") ? nx3d::economy::kTSpawns : nx3d::economy::kCtSpawns;
     m_lastSpawnIndex = SIZE_MAX;
@@ -133,6 +132,8 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             {
                 for (int puff = 0; puff < 16; ++puff)
                 {
+                    if (app.graphicsDetail == 0 && puff % 2 != 0) continue;
+                    if (app.graphicsDetail == 1 && puff >= 8 && puff % 2 != 0) continue;
                     const float angle = static_cast<float>(puff % 8) * 0.78539816f;
                     const float radius = puff < 8 ? 34.0f : 59.0f;
                     const float height = puff < 8 ? -13.0f : 16.0f;
@@ -147,6 +148,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
                                                  std::sin(angle) * radius));
                     app.scene_manager.getCurrentScene()->addObject(cloud);
                     it->puffs.push_back(std::move(cloud));
+                    it->puffSlots.push_back(puff);
                 }
             }
         }
@@ -162,9 +164,10 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             const float cloudAge = it->age - nx3d::economy::kGrenadeFuseSeconds;
             for (std::size_t puff = 0; puff < it->puffs.size(); ++puff)
             {
-                const float angle = static_cast<float>(puff % 8) * 0.78539816f;
-                const float radius = puff < 8 ? 34.0f : 59.0f;
-                const float height = puff < 8 ? -13.0f : 16.0f;
+                const int slot = it->puffSlots[puff];
+                const float angle = static_cast<float>(slot % 8) * 0.78539816f;
+                const float radius = slot < 8 ? 34.0f : 59.0f;
+                const float height = slot < 8 ? -13.0f : 16.0f;
                 it->puffs[puff]->setPosition(it->end + glm::vec3(
                         std::cos(angle) * radius + std::sin(cloudAge * 0.65f + angle) * 5.0f,
                         height + std::sin(cloudAge * 0.8f + angle) * 4.0f,
@@ -316,22 +319,6 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             app.ui->showLeaderboard(uiEntries);
         }
     }
-
-    std::vector<nx3d::client::ui::LeaderboardEntry> roster;
-    const auto roomId = app.client_api.clientRoomId();
-    for (const auto& room : app.client_api.getActiveRooms())
-    {
-        if (room.getId() != roomId)
-            continue;
-        for (const auto& client : room.getClients())
-        {
-            const auto it = m_leaderboard.find(client.getId());
-            if (it != m_leaderboard.end())
-                roster.push_back(it->second);
-        }
-        break;
-    }
-    app.ui->setTeamRoster(roster);
 }
 
 void DeathmatchMode::handleMouseButtonDown(ClientApp& app, const SDL_Event& event)
@@ -662,7 +649,10 @@ void DeathmatchMode::installOverlay(ClientApp& app)
         auto ctx = spear::ui::RenderContext{spear::rendering::vulkan::g_frameContext.commandBuffer};
         if (app.currentState == ClientApp::State::Paused)
             app.ui->renderPauseOverlay(ctx, app.quitHovered,
-                                       app.ctTeamHovered, app.tTeamHovered);
+                                       app.ctTeamHovered, app.tTeamHovered,
+                                       app.settingsHovered);
+        else if (app.currentState == ClientApp::State::Settings)
+            app.ui->renderSettingsOverlay(ctx, app.settingsRow);
         else if (app.currentState == ClientApp::State::Buy)
             app.ui->renderBuyOverlay(ctx);
         else if (app.game_mode && app.game_mode->isEliminated())
@@ -673,7 +663,7 @@ void DeathmatchMode::installOverlay(ClientApp& app)
         if (app.currentState == ClientApp::State::Game ||
             app.currentState == ClientApp::State::Paused)
             app.ui->renderPlayerNameplates(ctx);
-        if (m_crosshair && m_health > 0)
+        if (app.currentState == ClientApp::State::Game && m_crosshair && m_health > 0)
             m_crosshair->render(app.camera); });
 }
 

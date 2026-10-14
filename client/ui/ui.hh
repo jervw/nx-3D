@@ -5,6 +5,7 @@
 #include <shared/economy.hh>
 
 #include <cstdint>
+#include <array>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -89,7 +90,12 @@ public:
     /// Render the pause menu overlay (quads only; used from the overlay
     /// callback that also draws the crosshair).
     void renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
-                            bool ctHovered, bool tHovered);
+                            bool ctHovered, bool tHovered, bool settingsHovered);
+    void renderSettingsOverlay(spear::ui::RenderContext ctx, int selectedRow);
+    void showSettings(const std::array<std::string, 8>& values, int selectedRow);
+    void hideSettings();
+    int settingsRowAt(float x, float y) const;
+    int settingsDirectionAt(float x) const;
     void renderDeathOverlay(spear::ui::RenderContext ctx);
 
     /// Show the Tab leaderboard with the given entries. Terrorists are shown
@@ -105,9 +111,6 @@ public:
     /// Render the leaderboard backdrop/panel quads (used from the overlay
     /// callback; the row text itself is registered as regular UI text).
     void renderLeaderboardOverlay(spear::ui::RenderContext ctx);
-
-    /// Synchronize the volume slider/pause text with the given volume [0,1].
-    void updateVolumeDisplay(float volume);
 
     // --- Text elements -----------------------------------------------------
     spear::ui::vulkan::Text titleText;
@@ -126,8 +129,6 @@ public:
     spear::ui::vulkan::Text tButtonText;
     spear::ui::vulkan::Text teamSelectTitle;
     spear::ui::vulkan::Text teamSelectInstructions;
-    spear::ui::vulkan::Text hudCTRosterHeader;
-    spear::ui::vulkan::Text hudTRosterHeader;
     std::vector<std::unique_ptr<spear::ui::vulkan::Text>> teamRosterRows;
 
     static constexpr int kTeamRosterMaxRows = 30;
@@ -141,6 +142,7 @@ public:
     spear::ui::vulkan::Text matchStatusText;
     spear::ui::vulkan::Text bombText;
     spear::ui::vulkan::Text moneyText;
+    spear::ui::vulkan::Text fpsText;
     spear::ui::vulkan::Text buyTitleText;
     spear::ui::vulkan::Text buyHintText;
     spear::ui::vulkan::Text buyNoticeText;
@@ -150,9 +152,16 @@ public:
     spear::ui::vulkan::Text pauseTeamTitle;
     spear::ui::vulkan::Text pauseCTText;
     spear::ui::vulkan::Text pauseTText;
-    spear::ui::vulkan::Text pauseVolumeText;
     spear::ui::vulkan::Text pauseQuitText;
+    spear::ui::vulkan::Text pauseSettingsText;
     spear::ui::vulkan::Text pauseInstructions;
+    spear::ui::vulkan::Text settingsTitle;
+    spear::ui::vulkan::Text settingsHint;
+    spear::ui::vulkan::Text settingsBack;
+    std::vector<std::unique_ptr<spear::ui::vulkan::Text>> settingsRows;
+    std::vector<std::unique_ptr<spear::ui::vulkan::Text>> settingsValues;
+    std::vector<std::unique_ptr<spear::ui::vulkan::Text>> settingsLeftArrows;
+    std::vector<std::unique_ptr<spear::ui::vulkan::Text>> settingsRightArrows;
 
     // --- Leaderboard (Tab) --------------------------------------------------
     spear::ui::vulkan::Text leaderboardTitle;
@@ -217,20 +226,21 @@ private:
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_deathBandQuad;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pausePanelBorder;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pausePanel;
-    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderTrack;
-    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderFill;
-    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSliderKnob;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseCTButton;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseCTButtonHover;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseTButton;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseTButtonHover;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseQuitButton;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseQuitButtonHover;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSettingsButton;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_pauseSettingsButtonHover;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_settingsPanel;
+    std::shared_ptr<spear::ui::vulkan::Quad2D> m_settingsSelection;
+    int m_settingsSelectedRow = -1;
 
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_leaderboardBackdropQuad;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_leaderboardPanelQuad;
     bool m_leaderboardVisible = false;
-    bool m_teamRosterInHud = false;
 
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_chatBackdropQuad;
     bool m_chatVisible = false;
