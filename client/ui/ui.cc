@@ -33,6 +33,8 @@ Ui::Ui(VkDevice device,
                  descriptorPool, descriptorSetLayout, fontPath, 20),
       instructionsText(device, physDevice, commandPool, graphicsQueue,
                        descriptorPool, descriptorSetLayout, fontPath, 16),
+      serverPlayerCountText(device, physDevice, commandPool, graphicsQueue,
+                            descriptorPool, descriptorSetLayout, fontPath, 18),
 
       serverInputLabel(device, physDevice, commandPool, graphicsQueue,
                        descriptorPool, descriptorSetLayout, fontPath, 24),
@@ -54,6 +56,10 @@ Ui::Ui(VkDevice device,
                       descriptorPool, descriptorSetLayout, fontPath, 32),
       teamSelectInstructions(device, physDevice, commandPool, graphicsQueue,
                              descriptorPool, descriptorSetLayout, fontPath, 16),
+      hudCTRosterHeader(device, physDevice, commandPool, graphicsQueue,
+                        descriptorPool, descriptorSetLayout, fontPath, 16),
+      hudTRosterHeader(device, physDevice, commandPool, graphicsQueue,
+                       descriptorPool, descriptorSetLayout, fontPath, 16),
 
       healthText(device, physDevice, commandPool, graphicsQueue,
                  descriptorPool, descriptorSetLayout, fontPath, 24),
@@ -120,6 +126,20 @@ Ui::Ui(VkDevice device,
     leaderboardCTHeader.setColor(SDL_Color{0, 150, 255, 255});
     leaderboardCTHeader.setPosition(glm::vec2(0.0f, 0.34f));
 
+    serverPlayerCountText.setString("");
+    serverPlayerCountText.setColor(SDL_Color{205, 228, 240, 255});
+    serverPlayerCountText.setPosition(glm::vec2(0.68f, 0.93f));
+
+    teamRosterRows.reserve(kTeamRosterMaxRows);
+    for (int i = 0; i < kTeamRosterMaxRows; ++i)
+    {
+        auto row = std::make_unique<spear::ui::vulkan::Text>(
+                device, physDevice, commandPool, graphicsQueue,
+                descriptorPool, descriptorSetLayout, fontPath, 14);
+        row->setString("");
+        teamRosterRows.push_back(std::move(row));
+    }
+
     buildLeaderboard();
     buildChat();
     buildBuyMenu();
@@ -172,7 +192,14 @@ Ui::Ui(VkDevice device,
 
     teamSelectInstructions.setString("Click a team to join");
     teamSelectInstructions.setColor(SDL_Color{200, 200, 200, 255});
-    teamSelectInstructions.setPosition(glm::vec2(-0.25f, -0.3f));
+    teamSelectInstructions.setPosition(glm::vec2(-0.25f, 0.25f));
+
+    hudCTRosterHeader.setString("Counter Terrorist");
+    hudCTRosterHeader.setColor(SDL_Color{135, 205, 255, 255});
+    hudCTRosterHeader.setPosition(glm::vec2(0.20f, 0.56f));
+    hudTRosterHeader.setString("Terrorist");
+    hudTRosterHeader.setColor(SDL_Color{255, 190, 115, 255});
+    hudTRosterHeader.setPosition(glm::vec2(0.20f, -0.10f));
 
     // --- In-game HUD ---------------------------------------------------------
     healthText.setString("HP: 100");
@@ -556,6 +583,7 @@ void Ui::showMenuTexts()
     registerText(titleText);
     registerText(statusText);
     registerText(instructionsText);
+    registerText(serverPlayerCountText);
 }
 
 void Ui::showServerInputTexts()
@@ -573,16 +601,70 @@ void Ui::showTeamSelectTexts()
 {
     clear();
     m_playerNameplates.clear();
+    m_teamRosterInHud = false;
     registerText(teamSelectTitle);
     registerText(teamSelectInstructions);
     registerText(ctButtonText);
     registerText(tButtonText);
+    registerText(serverPlayerCountText);
+    for (auto& row : teamRosterRows)
+        registerText(*row);
+}
+
+void Ui::setTeamRoster(const std::vector<LeaderboardEntry>& entries)
+{
+    std::vector<LeaderboardEntry> ct;
+    std::vector<LeaderboardEntry> t;
+    for (const auto& entry : entries)
+    {
+        if (entry.team == "Counter Terrorist")
+            ct.push_back(entry);
+        else if (entry.team == "Terrorist")
+            t.push_back(entry);
+    }
+    auto byName = [](const LeaderboardEntry& a, const LeaderboardEntry& b)
+    {
+        return a.username < b.username;
+    };
+    std::sort(ct.begin(), ct.end(), byName);
+    std::sort(t.begin(), t.end(), byName);
+
+    int row = 0;
+    auto addSide = [&](const std::vector<LeaderboardEntry>& players, float leftX,
+                       float startY, SDL_Color color)
+    {
+        for (std::size_t i = 0; i < players.size() && row < kTeamRosterMaxRows; ++i)
+        {
+            auto& text = *teamRosterRows[row++];
+            const float x = leftX + (i / 15) * (m_teamRosterInHud ? 0.38f : 0.41f);
+            const float y = startY - (i % 15) * (m_teamRosterInHud ? 0.035f : 0.05f);
+            text.setPosition(glm::vec2(x, y));
+            text.setColor(color);
+            if (text.getString() != players[i].username)
+                text.setString(players[i].username);
+        }
+    };
+    addSide(ct, m_teamRosterInHud ? 0.20f : -0.78f,
+            m_teamRosterInHud ? 0.49f : -0.08f,
+            SDL_Color{135, 205, 255, 255});
+    addSide(t, m_teamRosterInHud ? 0.20f : 0.16f,
+            m_teamRosterInHud ? -0.17f : -0.08f,
+            SDL_Color{255, 190, 115, 255});
+    for (; row < kTeamRosterMaxRows; ++row)
+        if (!teamRosterRows[row]->getString().empty())
+            teamRosterRows[row]->setString("");
 }
 
 void Ui::showGameHudTexts()
 {
     clear();
+    m_teamRosterInHud = true;
     registerText(healthText);
+    registerText(serverPlayerCountText);
+    registerText(hudCTRosterHeader);
+    registerText(hudTRosterHeader);
+    for (auto& row : teamRosterRows)
+        registerText(*row);
     registerText(weaponHudText);
     registerText(hitmarkerText);
     registerText(wastedText);

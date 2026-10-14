@@ -291,6 +291,9 @@ void ClientApp::setupScenes()
 void ClientApp::connect(const std::string& address)
 {
     serverAddress = address;
+    serverPlayerCountRefresh = 0.0f;
+    teamSelectPlayers.clear();
+    ui->serverPlayerCountText.setString("");
     tcp_client.stop();
     client_api = nexilis::client::ClientAPI(
             nexilis::client::createClientConfig(serverAddress, "password"));
@@ -556,6 +559,30 @@ void ClientApp::updateChatMessages()
     }
 }
 
+void ClientApp::updateTeamSelectRoster()
+{
+    for (auto& event : client_api.consumeLeaderboardEvents())
+        for (auto& entry : event.entries)
+            if (entry.id != 0)
+                teamSelectPlayers[entry.id] =
+                        {entry.id, entry.username, entry.team, entry.kills, entry.deaths};
+
+    std::vector<ui::LeaderboardEntry> players;
+    for (const auto& room : client_api.getActiveRooms())
+    {
+        if (room.getId() != selectedRoomId)
+            continue;
+        for (const auto& client : room.getClients())
+        {
+            const auto it = teamSelectPlayers.find(client.getId());
+            if (it != teamSelectPlayers.end())
+                players.push_back(it->second);
+        }
+        break;
+    }
+    ui->setTeamRoster(players);
+}
+
 void ClientApp::updateChatWindow(float delta_time)
 {
     if (!chatActive)
@@ -650,12 +677,31 @@ void ClientApp::run()
             udp_client.start();
         }
 
+        if (ready && currentState != State::ServerInput)
+        {
+            serverPlayerCountRefresh -= delta_time;
+            if (serverPlayerCountRefresh <= 0.0f)
+            {
+                tcp_client.sendMessage(packet::Get::Info::clients(client_api));
+                serverPlayerCountRefresh = 2.0f;
+            }
+            const auto count = client_api.getServerClientCount();
+            const std::string label = count ? "Players: " + std::to_string(count)
+                                            : "Players: ...";
+            if (ui->serverPlayerCountText.getString() != label)
+                ui->serverPlayerCountText.setString(label);
+        }
+
         if (currentState == State::Joining && client_api.clientInRoom())
         {
+            teamSelectPlayers.clear();
             ui->showTeamSelectTexts();
             renderer.setUIRenderer(&ui->renderer());
             currentState = State::TeamSelect;
         }
+
+        if (currentState == State::TeamSelect)
+            updateTeamSelectRoster();
 
         // --- Event handling ---
         if (currentState == State::ServerInput)

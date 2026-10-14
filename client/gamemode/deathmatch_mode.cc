@@ -82,6 +82,7 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
 
     app.ui->hideLeaderboard();
     m_leaderboard.clear();
+    app.ui->setTeamRoster({});
 
     const auto& spawns = (m_team == "Terrorist") ? nx3d::economy::kTSpawns : nx3d::economy::kCtSpawns;
     m_lastSpawnIndex = SIZE_MAX;
@@ -315,6 +316,22 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             app.ui->showLeaderboard(uiEntries);
         }
     }
+
+    std::vector<nx3d::client::ui::LeaderboardEntry> roster;
+    const auto roomId = app.client_api.clientRoomId();
+    for (const auto& room : app.client_api.getActiveRooms())
+    {
+        if (room.getId() != roomId)
+            continue;
+        for (const auto& client : room.getClients())
+        {
+            const auto it = m_leaderboard.find(client.getId());
+            if (it != m_leaderboard.end())
+                roster.push_back(it->second);
+        }
+        break;
+    }
+    app.ui->setTeamRoster(roster);
 }
 
 void DeathmatchMode::handleMouseButtonDown(ClientApp& app, const SDL_Event& event)

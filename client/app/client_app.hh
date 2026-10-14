@@ -142,6 +142,8 @@ public:
     std::atomic<bool> joiningRoom{false};
     uint64_t selectedRoomId = 0;
     nx3d::GameMode selectedRoomGameMode = nx3d::GameMode::deathmatch;
+    float serverPlayerCountRefresh = 0.0f;
+    std::unordered_map<uint64_t, ui::LeaderboardEntry> teamSelectPlayers;
 
     // --- Server address input ------------------------------------------------
     std::string serverAddressInput = "127.0.0.1";
@@ -245,6 +247,7 @@ public:
     void updateChatMessages();
     /// Count down the visibility timer and refresh the chat window UI.
     void updateChatWindow(float delta_time);
+    void updateTeamSelectRoster();
 
     // --- Helpers ----------------------------------------------------------------
     void connect(const std::string& address);

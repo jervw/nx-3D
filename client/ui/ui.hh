@@ -77,6 +77,8 @@ public:
     void showTeamSelectTexts();
     /// Register the in-game HUD (clears previous UI).
     void showGameHudTexts();
+    /// Show the players already assigned to each side on the team screen.
+    void setTeamRoster(const std::vector<LeaderboardEntry>& entries);
     void showBuyMenu(BuyStyle style, const nx3d::economy::Snapshot& state,
                      const std::string& team, const std::string& notice,
                      bool bombMatch);
@@ -111,6 +113,7 @@ public:
     spear::ui::vulkan::Text titleText;
     spear::ui::vulkan::Text statusText;
     spear::ui::vulkan::Text instructionsText;
+    spear::ui::vulkan::Text serverPlayerCountText;
 
     spear::ui::vulkan::Text serverInputLabel;
     spear::ui::vulkan::Text serverAddressText;
@@ -123,6 +126,11 @@ public:
     spear::ui::vulkan::Text tButtonText;
     spear::ui::vulkan::Text teamSelectTitle;
     spear::ui::vulkan::Text teamSelectInstructions;
+    spear::ui::vulkan::Text hudCTRosterHeader;
+    spear::ui::vulkan::Text hudTRosterHeader;
+    std::vector<std::unique_ptr<spear::ui::vulkan::Text>> teamRosterRows;
+
+    static constexpr int kTeamRosterMaxRows = 30;
 
     spear::ui::vulkan::Text healthText;
     spear::ui::vulkan::Text weaponHudText;
@@ -222,6 +230,7 @@ private:
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_leaderboardBackdropQuad;
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_leaderboardPanelQuad;
     bool m_leaderboardVisible = false;
+    bool m_teamRosterInHud = false;
 
     std::shared_ptr<spear::ui::vulkan::Quad2D> m_chatBackdropQuad;
     bool m_chatVisible = false;
