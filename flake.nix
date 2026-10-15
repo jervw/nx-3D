@@ -23,7 +23,7 @@
         src = self.outPath;
 
         nativeBuildInputs = [ pkgs.cmake ];
-        buildInputs = [ nexilisPkg pkgs.boost pkgs.openssl ];
+        buildInputs = [ nexilisPkg pkgs.boost pkgs.openssl pkgs.bullet pkgs.glm ];
         cmakeFlags = [ "-DNX3D_USE_SYSTEM_NEXILIS=ON" ];
 
         preConfigure = ''
