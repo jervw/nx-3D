@@ -1,6 +1,7 @@
 #include <server/gamemode/game_mode_registry.hh>
-#include <shared/fall_death.hh>
 #include <shared/economy.hh>
+#include <shared/fall_death.hh>
+#include <shared/player_rules.hh>
 
 #include <nexilis/client/packet.hh>
 #include <nexilis/command_type.hh>
@@ -8,7 +9,9 @@
 #include <nexilis/server/command/command.hh>
 #include <nexilis/server/room_storage.hh>
 
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 namespace
@@ -49,8 +52,7 @@ int main()
         {
             require(api.readMessage(server::Command::clientMessageData(
                             CommandType::room, "management", 0,
-                            {{"action", "create"}, {"room_id", 777}, {"client_id", id},
-                             {"room_name", "test"}, {"room_context", 1}})) == client::ReadResult::success,
+                            {{"action", "create"}, {"room_id", 777}, {"client_id", id}, {"room_name", "test"}, {"room_context", 1}})) == client::ReadResult::success,
                     "Test client could not join room messages");
             auto user = std::make_unique<server::User>(id, "127.0.0.1");
             user->setRoomId(777);
@@ -62,6 +64,19 @@ int main()
         };
         addUser(10, shooter);
         addUser(20, victim);
+        auto announce = [](client::ClientAPI& api, uint64_t id)
+        {
+            require(api.readMessage(server::Command::clientMessageData(
+                            CommandType::room, "management", 0,
+                            {{"action", "join"}, {"room_id", 777}, {"client_id", id}, {"username", boost::json::value("player_" + std::to_string(id))}})) ==
+                            client::ReadResult::success,
+                    "Test client could not register room player");
+        };
+        for (auto* api : {&shooter, &victim})
+        {
+            announce(*api, 10);
+            announce(*api, 20);
+        }
 
         // Register callbacks before adding more rooms, as the real server does.
         for (uint64_t id = 777; id < 780; ++id)
@@ -72,6 +87,28 @@ int main()
         auto* room = server::RoomStorage::getRoomById(777);
         room->joinRoom(10);
         room->joinRoom(20);
+        server::ServerConfig settings;
+        // This fixture fires hundreds of shots back-to-back to exercise
+        // death/respawn; production keeps its separate fire-rate limit.
+        settings.getGameplayLimits().setMaxShootingRate(0.0f);
+        server::Command command(settings);
+        TestProtocol protocol;
+        auto sendAsShooter = [&](const nx_data& packet)
+        {
+            nx_data payload(packet.begin() + 16, packet.end());
+            return command.read(payload, *server::ClientStorage::getClientById(10), protocol, 1);
+        };
+        const auto beforeTeam = server::ClientStorage::getClientById(10)->getObject3D().getPosition();
+        require(sendAsShooter(client::Packet::Room::Player3D::movement(
+                        shooter, Vector3f{1.0f, 0.0f, 0.0f}, 0.0f, 0.0f)) ==
+                        server::CommandResult::success,
+                "Movement before team selection was reported as invalid");
+        require(server::ClientStorage::getClientById(10)->getObject3D().getPosition().x == beforeTeam.x,
+                "Movement before team selection changed server position");
+        require(sendAsShooter(client::Packet::Room::Player3D::movement(
+                        shooter, Vector3f{std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f},
+                        0.0f, 0.0f)) == server::CommandResult::invalid_input,
+                "Non-finite movement was accepted before team selection");
         room->setPlayerTeam(10, "Terrorist");
         room->setPlayerTeam(20, "Counter Terrorist");
         auto* shopper = server::ClientStorage::getClientById(10);
@@ -83,20 +120,84 @@ int main()
                 "Weapon purchase did not update equipment and money");
         shopper->getObject3D().setPosition(Vector3f{0.0f, 0.0f, 0.0f});
         require(!room->onPlayerAction(10, 13), "Remote purchase was accepted");
-        server::ServerConfig settings;
-        // This fixture fires hundreds of shots back-to-back to exercise
-        // death/respawn; production keeps its separate fire-rate limit.
-        settings.getGameplayLimits().setMaxShootingRate(0.0f);
-        server::Command command(settings);
-        TestProtocol protocol;
+        const auto originalPosition = shopper->getObject3D().getPosition();
+        require(sendAsShooter(client::Packet::Room::Player3D::position(
+                        shooter, Vector3f{4000.0f, 400.0f, 4000.0f})) ==
+                        server::CommandResult::invalid_input,
+                "Client position packet bypassed server movement");
+        require(shopper->getObject3D().getPosition().x == originalPosition.x,
+                "Rejected position changed server state");
+        require(sendAsShooter(client::Packet::Room::Player3D::shoot(shooter, 20, 35.0f)) ==
+                        server::CommandResult::invalid_input,
+                "Client target/damage packet bypassed server hit test");
+        require(room->getPlayerHealth(20) == 100.0f, "Spoofed damage was accepted");
+        require(sendAsShooter(client::Packet::Room::Player3D::fire(
+                        shooter, Vector3f{0.0f, 0.0f, -1.0f}, 1)) ==
+                        server::CommandResult::success,
+                "Unowned weapon request was not handled");
+        require(room->getPlayerHealth(20) == 100.0f, "Unowned weapon dealt damage");
+
+        // Client-supplied displacement and delta time are ignored in this room.
+        require(sendAsShooter(client::Packet::Room::Player3D::movement(
+                        shooter, Vector3f{100000.0f, 100000.0f, 0.0f}, 1000.0f, 0.0f)) ==
+                        server::CommandResult::success,
+                "Movement intent rejected");
+        const auto afterMove = shopper->getObject3D().getPosition();
+        require(std::abs(afterMove.x - originalPosition.x) <= nx3d::kWalkSpeed * 0.1f + 1.0f,
+                "Forged movement speed or delta moved the server player too far");
+
+        const auto groundItem = client::Packet::Room::GameItem::create(
+                shooter, originalPosition, Vector3f{1, 1, 1},
+                "ak47:30:90", "on_ground", "");
+        require(sendAsShooter(groundItem) == server::CommandResult::failure,
+                "Client created a weapon pickup");
+        require(sendAsShooter(client::Packet::Room::Player3D::matchAction(
+                        shooter, nx3d::economy::kDropSecondaryAction)) ==
+                        server::CommandResult::success,
+                "Server rejected a legitimate weapon drop");
+        require(room->getGameItems().size() == 1, "Server did not create the pickup");
+        const auto itemId = room->getGameItems().front().getId();
+        require(sendAsShooter(client::Packet::Room::GameItem::destroy(shooter, itemId)) ==
+                        server::CommandResult::failure,
+                "Client removed a server weapon pickup");
+        require(sendAsShooter(client::Packet::Room::GameItem::update(
+                        shooter, itemId, "on_ground")) == server::CommandResult::failure,
+                "Client changed a weapon status without picking it up");
+        const auto pickupPosition = shopper->getObject3D().getPosition();
+        shopper->getObject3D().setPosition(Vector3f{4000, 100, 4000});
+        require(sendAsShooter(client::Packet::Room::GameItem::update(
+                        shooter, itemId, "picked_up")) == server::CommandResult::failure,
+                "Client picked up a distant weapon");
+        shopper->getObject3D().setPosition(pickupPosition);
+        require(sendAsShooter(client::Packet::Room::GameItem::update(
+                        shooter, itemId, "picked_up")) == server::CommandResult::success,
+                "Server rejected a nearby weapon pickup");
+        require(room->getGameItems().empty(),
+                "Server did not consume the pickup");
+        require(sendAsShooter(client::Packet::Room::GameItem::update(
+                        shooter, itemId, "picked_up")) == server::CommandResult::failure,
+                "Server allowed the same weapon to be picked up twice");
+
+        room->spawnPlayer(10);
+        shopper->getObject3D().setPosition(Vector3f{pickupPosition.x,
+                                                    pickupPosition.y + 100.0f,
+                                                    pickupPosition.z});
+        const float airborneY = shopper->getObject3D().getPosition().y;
+        Registry::update(0.05f);
+        require(shopper->getObject3D().getPosition().y < airborneY,
+                "Server stopped gravity when movement packets stopped");
 
         for (uint64_t kill = 1; kill <= 100; ++kill)
         {
+            auto* target = server::ClientStorage::getClientById(20);
+            shopper->getObject3D().setPosition(Vector3f{-592.0f, 192.0f, 764.0f});
+            target->getObject3D().setPosition(Vector3f{-592.0f, 192.0f, 764.0f});
             for (int shot = 0; shot < 3; ++shot)
             {
-                auto packet = client::Packet::Room::Player3D::shoot(shooter, 20, 35.0f);
-                nx_data payload(packet.begin() + 16, packet.end());
-                require(command.read(payload, *server::ClientStorage::getClientById(10), protocol, 1) == server::CommandResult::success, "Shot rejected");
+                require(sendAsShooter(client::Packet::Room::Player3D::fire(
+                                shooter, Vector3f{0.0f, 0.0f, -1.0f}, 3)) ==
+                                server::CommandResult::success,
+                        "Shot rejected");
             }
             require(room->getPlayerHealth(20) == 0.0f, "Victim did not stay dead");
             require(victim.consumeRespawnEvents().empty(), "Victim respawned too early");

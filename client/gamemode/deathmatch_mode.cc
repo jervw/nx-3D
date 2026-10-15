@@ -1,6 +1,5 @@
 #include <client/app/client_app.hh>
 #include <client/gamemode/deathmatch_mode.hh>
-#include <client/gamemode/player_hit_test.hh>
 #include <client/gamemode/weapon_profiles.hh>
 #include <shared/ammunition.hh>
 
@@ -9,7 +8,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <limits>
 
 namespace nx3d::client::gamemode
 {
@@ -25,41 +23,6 @@ constexpr float kRecoilStartMultiplier = 0.6f;
 constexpr float kRecoilStep = 0.15f;
 constexpr float kMaxRecoilMultiplier = 2.5f;
 
-class MapRayResultCallback : public btCollisionWorld::ClosestRayResultCallback
-{
-public:
-    MapRayResultCallback(const btVector3& from, const btVector3& to,
-                         const btCollisionObject* mapBody)
-        : btCollisionWorld::ClosestRayResultCallback(from, to),
-          m_mapBody(mapBody)
-    {
-    }
-
-    btScalar addSingleResult(btCollisionWorld::LocalRayResult& result,
-                             bool normalInWorldSpace) override
-    {
-        if (result.m_collisionObject != m_mapBody)
-            return 1.0f;
-        return ClosestRayResultCallback::addSingleResult(result, normalInWorldSpace);
-    }
-
-private:
-    const btCollisionObject* m_mapBody;
-};
-
-bool mapBlocksShot(const ClientApp& app, const glm::vec3& origin,
-                   const glm::vec3& direction, float targetDistance)
-{
-    if (!app.mapCollisionBody || !app.shared_world || !std::isfinite(targetDistance))
-        return false;
-
-    const glm::vec3 target = origin + direction * targetDistance;
-    const btVector3 from(origin.x, origin.y, origin.z);
-    const btVector3 to(target.x, target.y, target.z);
-    MapRayResultCallback hit(from, to, app.mapCollisionBody);
-    app.shared_world->rayTest(from, to, hit);
-    return hit.hasHit() && hit.m_closestHitFraction < 1.0f;
-}
 } // namespace
 
 nx3d::GameMode DeathmatchMode::type() const
@@ -90,15 +53,6 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
         app.camera.setPosition(pickSpawnPoint());
         app.movement_controller.resetVerticalMotion();
     }
-
-    // A previous fall can leave the server's stored position below the map.
-    // Send the new spawn over TCP before selecting a team, because selecting
-    // a team makes the player eligible for the server's fall-death check.
-    const glm::vec3 spawn = app.camera.getPosition();
-    const glm::vec3 forward = app.camera.getFront();
-    const float yaw = std::atan2(-forward.x, -forward.z);
-    app.tcp_client.sendMessage(packet::Room::Player3D::position(
-            app.client_api, nexilis::Vector3f({spawn.x, spawn.y, spawn.z}), yaw));
 
     // The server replies with a stats seed for the local leaderboard.
     app.tcp_client.sendMessage(packet::Room::Player3D::setTeam(app.client_api, team));
@@ -363,25 +317,9 @@ void DeathmatchMode::fireWeapon(ClientApp& app)
 
     if (m_activeSlot == 3)
     {
-        const glm::vec3 origin = app.camera.getPosition();
         const glm::vec3 direction = glm::normalize(app.camera.getFront());
-        const auto players = app.client_api.getRemotePlayersSnapshot(
-                app.client_api.clientRoomId(), app.client_api.getClientId());
-        float closest = 100.0f;
-        uint64_t target = 0;
-        for (const auto& player : players)
-        {
-            if (app.remote_dead_players.contains(player.id)) continue;
-            const float distance = playerHitDistance(origin, direction,
-                                                     {player.x, player.y, player.z}, player.yaw);
-            if (distance < closest)
-            {
-                closest = distance;
-                target = player.id;
-            }
-        }
-        if (target && !mapBlocksShot(app, origin, direction, closest))
-            app.tcp_client.sendMessage(packet::Room::Player3D::shoot(app.client_api, target, 35.0f));
+        app.tcp_client.sendMessage(packet::Room::Player3D::fire(
+                app.client_api, nexilis::Vector3f(direction.x, direction.y, direction.z), 3));
         return;
     }
 
@@ -418,7 +356,6 @@ void DeathmatchMode::fireWeapon(ClientApp& app)
     // Capture the aim direction BEFORE the aim punch is applied, so the
     // bullet goes exactly where the crosshair points when firing. The punch
     // below is purely visual feedback and decays after the shot.
-    glm::vec3 rayOrigin = app.camera.getPosition();
     glm::vec3 rayDir = glm::normalize(app.camera.getFront());
 
     if (m_firstPersonGun)
@@ -429,32 +366,9 @@ void DeathmatchMode::fireWeapon(ClientApp& app)
     float yawKick = (static_cast<float>(rand() % 100) - 50.0f) / 50.0f * 0.6f * recoilMul;
     app.camera.addRecoilOffset(1.4f * recoilMul, yawKick);
 
-    auto room_id = app.client_api.clientRoomId();
-    auto my_id = app.client_api.getClientId();
-    auto players = app.client_api.getRemotePlayersSnapshot(room_id, my_id);
-
-    float closestDist = std::numeric_limits<float>::max();
-    uint64_t hitTargetId = 0;
-
-    for (auto& player : players)
-    {
-        if (app.remote_dead_players.contains(player.id))
-            continue;
-        const float distance = playerHitDistance(rayOrigin, rayDir,
-                                                 {player.x, player.y, player.z}, player.yaw);
-        if (distance < closestDist)
-        {
-            closestDist = distance;
-            hitTargetId = player.id;
-        }
-    }
-
-    if (hitTargetId != 0 && !mapBlocksShot(app, rayOrigin, rayDir, closestDist))
-    {
-        app.tcp_client.sendMessage(
-                packet::Room::Player3D::shoot(app.client_api, hitTargetId,
-                                              getWeaponProfile(m_pickedUpItemType).damage));
-    }
+    app.tcp_client.sendMessage(packet::Room::Player3D::fire(
+            app.client_api, nexilis::Vector3f(rayDir.x, rayDir.y, rayDir.z),
+            static_cast<uint8_t>(m_activeSlot)));
 }
 
 void DeathmatchMode::handleKeyDown(ClientApp& app, const SDL_Event& event)
@@ -523,9 +437,6 @@ void DeathmatchMode::onEconomySnapshot(ClientApp& app, const nx3d::economy::Snap
     {
         const int slot = nx3d::economy::isSecondary(state.weapon) ? 2 : 1;
         GunSlot& purchased = slot == 1 ? m_primary : m_secondary;
-        if (purchased.itemId != 0 && app.ready && app.client_api.clientInRoom())
-            app.tcp_client.sendMessage(nexilis::client::Packet::Room::GameItem::destroy(
-                    app.client_api, purchased.itemId));
         purchased.type = state.weapon;
         purchased.ammo = -1;
         purchased.reserve = -1;
@@ -682,13 +593,6 @@ glm::vec3 DeathmatchMode::pickSpawnPoint()
 
 void DeathmatchMode::equipWeaponForTeam(ClientApp& app)
 {
-    if (app.ready && app.client_api.clientInRoom())
-    {
-        for (const auto& slot : {m_primary, m_secondary})
-            if (slot.itemId != 0)
-                app.tcp_client.sendMessage(nexilis::client::Packet::Room::GameItem::destroy(
-                        app.client_api, slot.itemId));
-    }
     m_primary = {};
     m_secondary = {};
     m_secondary.type = nx3d::economy::defaultWeapon(m_team);
@@ -756,9 +660,6 @@ void DeathmatchMode::throwGrenade(ClientApp& app)
     if (glm::length(direction) < 0.001f)
         direction = glm::vec3(0.0f, 0.0f, -1.0f);
     direction = glm::normalize(direction);
-    const float yaw = std::atan2(-direction.x, -direction.z);
-    app.tcp_client.sendMessage(packet::Room::Player3D::position(
-            app.client_api, nexilis::Vector3f({origin.x, origin.y, origin.z}), yaw));
     app.tcp_client.sendMessage(packet::Room::Player3D::matchAction(
             app.client_api, smoke ? nx3d::economy::kThrowSmokeAction :
                                     nx3d::economy::kThrowGrenadeAction));
@@ -821,6 +722,9 @@ void DeathmatchMode::startReload(ClientApp& app)
     m_burstShots = 0;
     m_fireCooldown = 0.0f;
     m_reloadRemaining = getWeaponProfile(m_pickedUpItemType).reload_seconds;
+    if (app.ready && app.client_api.clientInRoom())
+        app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::reload(
+                app.client_api, static_cast<uint8_t>(m_activeSlot)));
     if (m_firstPersonGun)
         m_firstPersonGun->startReload(m_reloadRemaining);
     refreshWeaponHud(app);
@@ -846,34 +750,10 @@ void DeathmatchMode::dropCurrentWeapon(ClientApp& app)
     m_burstShots = 0;
     m_fireCooldown = 0.0f;
 
-    // If we were holding a map pickup, remove the original from the server.
-    if (m_pickedUpItemId != 0)
-    {
-        app.tcp_client.sendMessage(packet::Room::GameItem::destroy(app.client_api, m_pickedUpItemId));
-        m_pickedUpItemId = 0;
-    }
-
-    // Place the pickup just ahead of the player. The local physics body gets
-    // a forward impulse when the server echoes the newly created item.
-    glm::vec3 throwDirection = app.camera.getFront();
-    throwDirection.y = 0.0f;
-    if (glm::length(throwDirection) < 0.001f)
-        throwDirection = glm::vec3(0.0f, 0.0f, -1.0f);
-    throwDirection = glm::normalize(throwDirection);
-    glm::vec3 dropPos = app.camera.getPosition() + throwDirection * 25.0f;
-    dropPos.y -= 10.0f;
-    auto pos = nexilis::Vector3f({dropPos.x, dropPos.y, dropPos.z});
-    auto dim = nexilis::Vector3f({m_pickedUpItemSize.x, m_pickedUpItemSize.y, m_pickedUpItemSize.z});
-    const auto& profile = getWeaponProfile(m_pickedUpItemType);
-    app.tcp_client.sendMessage(
-            packet::Room::GameItem::create(app.client_api, pos, dim,
-                                           nx3d::ammunition::encodePickup(profile.type, m_ammo,
-                                                                           m_reserveAmmo),
-                                           "on_ground", profile.obj_path));
+    // The server creates the pickup from its own inventory and position.
     app.tcp_client.sendMessage(packet::Room::Player3D::matchAction(
             app.client_api, m_activeSlot == 1 ? nx3d::economy::kDropPrimaryAction :
                                             nx3d::economy::kDropSecondaryAction));
-    app.pending_weapon_throw = ClientApp::PendingWeaponThrow{dropPos, throwDirection};
     (m_activeSlot == 1 ? m_primary : m_secondary) = {};
     equipSlot(app, m_activeSlot == 1 ? (!m_secondary.type.empty() ? 2 : 3) :
                   (!m_primary.type.empty() ? 1 : 3));

@@ -23,7 +23,11 @@ list(FILTER NX3D_SERVER_SOURCES EXCLUDE REGEX "^${CMAKE_CURRENT_SOURCE_DIR}/buil
 
 add_executable(nx-3D-server ${NX3D_SERVER_SOURCES})
 target_include_directories(nx-3D-server PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
-target_link_libraries(nx-3D-server PRIVATE Nexilis::nexilis)
+target_compile_definitions(nx-3D-server PRIVATE PROJECT_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/..")
+find_package(Bullet REQUIRED)
+find_package(glm REQUIRED)
+target_include_directories(nx-3D-server PRIVATE ${BULLET_INCLUDE_DIRS})
+target_link_libraries(nx-3D-server PRIVATE Nexilis::nexilis ${BULLET_LIBRARIES} glm::glm)
 
 # The server uses boost::json directly, so link it explicitly instead of
 # relying on Nexilis::nexilis. An installed Nexilis built with vendored Boost

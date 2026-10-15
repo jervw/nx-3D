@@ -6,6 +6,7 @@
 #include <nexilis/server/room.hh>
 
 #include <cstdint>
+#include <string>
 
 namespace nx3d::server::gamemode
 {
@@ -40,6 +41,15 @@ public:
     virtual bool canSelectTeam(uint64_t) const
     {
         return true;
+    }
+    virtual std::string weaponForSlot(uint64_t, uint8_t) const
+    {
+        return {};
+    }
+    virtual bool pickupWeapon(nexilis::server::Room&, uint64_t, uint8_t,
+                              const std::string&)
+    {
+        return false;
     }
 
     /// Called once per server tick so the gamemode can run its own logic.

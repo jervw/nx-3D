@@ -21,6 +21,7 @@ nx3d::GameMode DeathmatchMode::type() const
 
 void DeathmatchMode::onTeamSelected(nexilis::server::Room& room, uint64_t playerId)
 {
+    room.spawnPlayer(playerId);
     m_economy.joined(room, playerId);
 }
 
@@ -99,6 +100,7 @@ void DeathmatchMode::update(nexilis::server::Room& room, float dt)
         if (!sender)
             continue;
         room.resetPlayerHealth(victimId);
+        room.spawnPlayer(victimId);
         m_economy.respawned(room, victimId);
         nexilis::nx_data respawnData{
                 static_cast<uint8_t>(nexilis::CommandType::room),

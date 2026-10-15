@@ -130,6 +130,43 @@ public:
         return it != m_wallets.end() && it->second.hasDefuseKit;
     }
 
+    std::string weaponForSlot(uint64_t id, uint8_t slot) const
+    {
+        if (slot == 3)
+            return "knife";
+        std::lock_guard lock(m_mutex);
+        const auto it = m_wallets.find(id);
+        if (it == m_wallets.end())
+            return {};
+        if (slot == 1)
+            return it->second.primary;
+        if (slot == 2)
+            return it->second.secondary;
+        return {};
+    }
+
+    bool pickupWeapon(nexilis::server::Room& room, uint64_t id, uint8_t slot,
+                      const std::string& weapon)
+    {
+        if (room.getPlayerHealth(id) <= 0.0f || room.getPlayerTeam(id).empty())
+            return false;
+        nx3d::economy::Snapshot state;
+        {
+            std::lock_guard lock(m_mutex);
+            auto it = m_wallets.find(id);
+            if (it == m_wallets.end())
+                return false;
+            auto& equipped = slot == 1 ? it->second.primary : it->second.secondary;
+            if (!equipped.empty())
+                return false;
+            equipped = weapon;
+            it->second.weapon = weapon;
+            state = it->second;
+        }
+        send(room, id, state);
+        return true;
+    }
+
     bool buy(nexilis::server::Room& room, uint64_t id, uint8_t action, bool alive,
              bool bombMatch = true)
     {
@@ -244,16 +281,20 @@ public:
 
     bool dropWeapon(nexilis::server::Room& room, uint64_t id, uint8_t action)
     {
+        if (room.getPlayerHealth(id) <= 0.0f || room.getPlayerTeam(id).empty())
+            return false;
         nx3d::economy::Snapshot state;
         {
             std::lock_guard lock(m_mutex);
-            auto& wallet = m_wallets[id];
-            if (action == nx3d::economy::kDropPrimaryAction)
-                wallet.primary.clear();
-            else if (action == nx3d::economy::kDropSecondaryAction)
-                wallet.secondary.clear();
-            else
+            auto it = m_wallets.find(id);
+            if (it == m_wallets.end())
                 return false;
+            auto& wallet = it->second;
+            std::string* equipped = action == nx3d::economy::kDropPrimaryAction ? &wallet.primary :
+                                    action == nx3d::economy::kDropSecondaryAction ? &wallet.secondary : nullptr;
+            if (!equipped || equipped->empty())
+                return false;
+            equipped->clear();
             state = wallet;
         }
         send(room, id, state);

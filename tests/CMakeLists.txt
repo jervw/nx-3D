@@ -5,22 +5,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../nexilis/nexilis/build")
 include(../cmake/Nexilis.cmake)
 find_package(Boost REQUIRED COMPONENTS json)
+find_package(Bullet REQUIRED)
+find_package(glm REQUIRED)
 enable_testing()
 
 add_executable(deathmatch_test deathmatch_test.cc
+    ../server/gamemode/authority.cc
     ../server/gamemode/deathmatch_mode.cc
     ../server/gamemode/bomb_mode.cc
     ../server/gamemode/game_mode_registry.cc)
 target_include_directories(deathmatch_test PRIVATE ..)
-target_link_libraries(deathmatch_test PRIVATE Nexilis::nexilis Boost::json)
+target_compile_definitions(deathmatch_test PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+target_include_directories(deathmatch_test PRIVATE ${BULLET_INCLUDE_DIRS})
+target_link_libraries(deathmatch_test PRIVATE Nexilis::nexilis Boost::json ${BULLET_LIBRARIES} glm::glm)
 add_test(NAME deathmatch COMMAND deathmatch_test)
 
 add_executable(bomb_mode_test bomb_mode_test.cc
+    ../server/gamemode/authority.cc
     ../server/gamemode/bomb_mode.cc
     ../server/gamemode/deathmatch_mode.cc
     ../server/gamemode/game_mode_registry.cc)
 target_include_directories(bomb_mode_test PRIVATE ..)
-target_link_libraries(bomb_mode_test PRIVATE Nexilis::nexilis Boost::json)
+target_compile_definitions(bomb_mode_test PRIVATE PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+target_include_directories(bomb_mode_test PRIVATE ${BULLET_INCLUDE_DIRS})
+target_link_libraries(bomb_mode_test PRIVATE Nexilis::nexilis Boost::json ${BULLET_LIBRARIES} glm::glm)
 add_test(NAME bomb_mode COMMAND bomb_mode_test)
 
 add_executable(bomb_player_state_test bomb_player_state_test.cc)
@@ -35,7 +43,6 @@ add_executable(ammunition_test ammunition_test.cc)
 target_include_directories(ammunition_test PRIVATE ..)
 add_test(NAME ammunition COMMAND ammunition_test)
 
-find_package(glm REQUIRED)
 add_executable(weapon_motion_test weapon_motion_test.cc)
 target_include_directories(weapon_motion_test PRIVATE ..)
 target_link_libraries(weapon_motion_test PRIVATE glm::glm)

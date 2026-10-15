@@ -20,6 +20,15 @@ public:
     void onPlayerDeath(nexilis::server::Room& room, uint64_t killerId, uint64_t victimId) override;
     void onTeamSelected(nexilis::server::Room& room, uint64_t playerId) override;
     bool onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t action) override;
+    std::string weaponForSlot(uint64_t playerId, uint8_t slot) const override
+    {
+        return m_economy.weaponForSlot(playerId, slot);
+    }
+    bool pickupWeapon(nexilis::server::Room& room, uint64_t id, uint8_t slot,
+                      const std::string& weapon) override
+    {
+        return m_economy.pickupWeapon(room, id, slot, weapon);
+    }
     void update(nexilis::server::Room& room, float dt) override;
 
 private:

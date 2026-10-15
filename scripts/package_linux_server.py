@@ -47,13 +47,17 @@ def main() -> None:
         package.mkdir()
         shutil.copy2(executable, package / executable.name)
         shutil.copy2(nexilis, package / nexilis.name)
+        map_asset = ROOT / "assets" / "de_dust2" / "source" / "de_dust2.obj"
+        packaged_map = package / "assets" / "de_dust2" / "source"
+        packaged_map.mkdir(parents=True)
+        shutil.copy2(map_asset, packaged_map / map_asset.name)
         for name, source in {**dependencies(executable), **dependencies(nexilis)}.items():
             if name != nexilis.name:
                 shutil.copy2(source, package / name)
 
         # DT_RUNPATH is not inherited by grandchildren; give each copied ELF
         # its own lookup path for libraries in this directory.
-        for binary in package.iterdir():
+        for binary in (path for path in package.iterdir() if path.is_file()):
             subprocess.run(["patchelf", "--set-rpath", "$ORIGIN", str(binary)], check=True)
 
         (package / "README.txt").write_text(

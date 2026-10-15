@@ -33,6 +33,15 @@ int main()
     server::RoomStorage::add(server::Room(RoomData(10, "Bomb test", 777)));
     auto* room = server::RoomStorage::getRoomById(777);
     GameModeRegistry::assignRoom(*room, nx3d::GameMode::bomb);
+    std::vector<std::pair<uint64_t, client::ClientAPI*>> presentClients;
+    auto announce = [](client::ClientAPI& api, uint64_t id)
+    {
+        check(api.readMessage(server::Command::clientMessageData(
+                      CommandType::room, "management", 0,
+                      {{"action", "join"}, {"room_id", 777}, {"client_id", id},
+                       {"username", boost::json::value("player_" + std::to_string(id))}})) == client::ReadResult::success,
+              "Test client could not register room player");
+    };
     auto add = [&](uint64_t id, client::ClientAPI& api, const char* team)
     {
         check(api.readMessage(server::Command::clientMessageData(
@@ -40,6 +49,13 @@ int main()
                       {{"action", "create"}, {"room_id", 777}, {"client_id", id},
                        {"room_name", "Bomb test"}, {"room_context", 1}})) == client::ReadResult::success,
               "Test client could not join room messages");
+        for (const auto& [otherId, otherApi] : presentClients)
+        {
+            announce(api, otherId);
+            announce(*otherApi, id);
+        }
+        announce(api, id);
+        presentClients.emplace_back(id, &api);
         auto user = std::make_unique<server::User>(id, "127.0.0.1");
         user->setRoomId(777);
         user->setUsername("player_" + std::to_string(id));
@@ -115,6 +131,12 @@ int main()
     check(!room->canDamage(30, 20), "Queued player could shoot");
     auto queueEvents = queued.consumeMatchEvents();
     check(bomb(queueEvents).queue_position == 1, "Queue position missing");
+    const auto queuedPosition = server::ClientStorage::getClientById(30)->getObject3D().getPosition();
+    check(room->onMovementInput(30, Vector3f{1.0f, 0.0f, 0.0f}, 0.0f),
+          "Queued player's movement packet was reported as invalid");
+    GameModeRegistry::update(0.05f);
+    check(server::ClientStorage::getClientById(30)->getObject3D().getPosition().x == queuedPosition.x,
+          "Queued player moved before being admitted");
 
     check(!room->onPlayerAction(10, 1), "Plant outside a bombsite was accepted");
     tUser->getObject3D().setPosition(Vector3f{1152.0f, 160.0f, -2416.0f});

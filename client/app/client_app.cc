@@ -337,7 +337,7 @@ std::unique_ptr<gamemode::GameMode> ClientApp::makeGameMode(nx3d::GameMode gameM
 
 void ClientApp::enterGame(const std::string& team)
 {
-    pose_send_elapsed = 1.0f;
+    input_send_elapsed = 1.0f;
     ui->showGameHudTexts();
     economyState = {};
     buyNotice.clear();
@@ -1166,11 +1166,6 @@ void ClientApp::run()
                     const int index = ui->buyItemAt(x, y);
                     if (index >= 0 && ready && client_api.clientInRoom())
                     {
-                        const auto pos = camera.getPosition();
-                        const auto forward = camera.getFront();
-                        const float yaw = std::atan2(-forward.x, -forward.z);
-                        tcp_client.sendMessage(packet::Room::Player3D::position(
-                                client_api, nexilis::Vector3f({pos.x, pos.y, pos.z}), yaw));
                         tcp_client.sendMessage(packet::Room::Player3D::matchAction(
                                 client_api, nx3d::economy::kItems[static_cast<std::size_t>(index)].action));
                     }
@@ -1240,6 +1235,50 @@ void ClientApp::run()
         if (size.x > 0 && size.y > 0)
             camera.setAspectRatio(static_cast<float>(size.x) / static_cast<float>(size.y));
 
+        if (ready && client_api.clientInRoom() &&
+            (currentState == State::Game || currentState == State::Buy ||
+             currentState == State::Paused || currentState == State::Settings))
+        {
+            input_send_elapsed += delta_time;
+            if (input_send_elapsed >= 0.05f)
+            {
+                glm::vec3 direction(0.0f);
+                const glm::vec3 front = camera.getFront();
+                const glm::vec3 forward = glm::normalize(glm::vec3(front.x, 0.0f, front.z));
+                const glm::vec3 right = glm::normalize(glm::vec3(camera.getRight().x, 0.0f,
+                                                                  camera.getRight().z));
+                const bool canMove = currentState == State::Game && game_mode && game_mode->canMove();
+                if (canMove)
+                {
+                    if (eventHandler.movementKeyDown(SDLK_W)) direction += forward;
+                    if (eventHandler.movementKeyDown(SDLK_S)) direction -= forward;
+                    if (eventHandler.movementKeyDown(SDLK_A)) direction -= right;
+                    if (eventHandler.movementKeyDown(SDLK_D)) direction += right;
+                    if (glm::length(direction) > 0.0f)
+                        direction = glm::normalize(direction);
+                }
+                const float yaw = std::atan2(-front.x, -front.z);
+                udp_client.sendMessage(packet::Room::Player3D::movement(
+                        client_api,
+                        nexilis::Vector3f({direction.x,
+                                           canMove && eventHandler.movementKeyDown(SDLK_SPACE) ? 1.0f : 0.0f,
+                                           direction.z}),
+                        0.0f, yaw));
+                input_send_elapsed = 0.0f;
+            }
+
+            const auto serverPosition = client_api.getClientPosition3D(client_api.getClientId());
+            if (serverPosition.x != 0.0f || serverPosition.y != 0.0f || serverPosition.z != 0.0f)
+            {
+                const glm::vec3 authoritative(serverPosition.x, serverPosition.y, serverPosition.z);
+                if (glm::distance(camera.getPosition(), authoritative) > 64.0f)
+                {
+                    camera.setPosition(authoritative);
+                    movement_controller.resetVerticalMotion();
+                }
+            }
+        }
+
         // --- Render ---
         renderer.render();
 
@@ -1280,49 +1319,6 @@ void ClientApp::run()
 
             if (ready && client_api.clientInRoom())
             {
-                auto cam_pos = camera.getPosition();
-                auto pos = nexilis::Vector3f({cam_pos.x, cam_pos.y, cam_pos.z});
-                const glm::vec3 forward = camera.getFront();
-                const float yaw = std::atan2(-forward.x, -forward.z);
-
-                if (pos.y < nx3d::kFallDeathY)
-                {
-                    was_below_fall_plane = true;
-                    // UDP movement may be lost. Repeat the out-of-bounds pose
-                    // over TCP until the server has time to register the death.
-                    fall_pose_send_elapsed += delta_time;
-                    if (fall_pose_send_elapsed >= 0.5f)
-                    {
-                        tcp_client.sendMessage(packet::Room::Player3D::position(client_api, pos, yaw));
-                        fall_pose_send_elapsed = 0.0f;
-                    }
-                }
-                else
-                {
-                    if (was_below_fall_plane)
-                    {
-                        // Re-arm the server's fall check after respawn even
-                        // if the first above-ground UDP update is dropped.
-                        tcp_client.sendMessage(packet::Room::Player3D::position(client_api, pos, yaw));
-                        was_below_fall_plane = false;
-                    }
-                    fall_pose_send_elapsed = 0.5f;
-                }
-
-                pose_send_elapsed += delta_time;
-                constexpr float kPositionEpsilon = 0.001f;
-                if (std::abs(pos.x - last_sent_position.x) > kPositionEpsilon ||
-                    std::abs(pos.y - last_sent_position.y) > kPositionEpsilon ||
-                    std::abs(pos.z - last_sent_position.z) > kPositionEpsilon ||
-                    std::abs(std::remainder(yaw - last_sent_yaw, 6.2831853f)) > 0.01f ||
-                    pose_send_elapsed >= 1.0f)
-                {
-                    udp_client.sendMessage(packet::Room::Player3D::position(client_api, pos, yaw));
-                    last_sent_position = cam_pos;
-                    last_sent_yaw = yaw;
-                    pose_send_elapsed = 0.0f;
-                }
-
                 syncRemotePlayerTransforms(delta_time);
                 syncRemoteObjects();
                 syncRemoteGameItems();
@@ -1664,15 +1660,6 @@ void ClientApp::syncRemoteGameItems()
                 {
                     body->setDamping(0.35f, 0.8f);
                     body->setSleepingThresholds(0.1f, 0.1f);
-                    if (pending_weapon_throw &&
-                        glm::distance(pending_weapon_throw->position,
-                                      glm::vec3(item.x, item.y, item.z)) < 0.1f)
-                    {
-                        const glm::vec3 impulse = pending_weapon_throw->direction * 320.0f +
-                                                  glm::vec3(0.0f, 75.0f, 0.0f);
-                        body->applyCentralImpulse(btVector3(impulse.x, impulse.y, impulse.z));
-                        pending_weapon_throw.reset();
-                    }
                 }
                 obj->rotate(glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
                 obj->scale(glm::vec3(profile.ground_scale));

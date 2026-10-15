@@ -12,6 +12,7 @@
 
 namespace nx3d::server::gamemode
 {
+class Authority;
 
 /// Owns the gamemode of every room and wires it up to the room's death events.
 ///
@@ -33,6 +34,7 @@ public:
 
 private:
     static std::unordered_map<uint64_t, std::unique_ptr<GameMode>> m_modes;
+    static std::unordered_map<uint64_t, std::unique_ptr<Authority>> m_authorities;
     static std::unordered_map<uint64_t, std::unordered_set<uint64_t>> m_fallenPlayers;
 };
 

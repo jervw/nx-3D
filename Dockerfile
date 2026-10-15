@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libboost-json-dev \
     libssl-dev \
+    libbullet-dev \
+    libglm-dev \
     python3-pip \
     python3-venv \
     ca-certificates \

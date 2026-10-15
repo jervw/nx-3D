@@ -138,7 +138,11 @@ bool BombMode::onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t 
                                      action == nx3d::economy::kThrowSmokeAction);
     if (action == nx3d::economy::kDropPrimaryAction ||
         action == nx3d::economy::kDropSecondaryAction)
+    {
+        if (m_phase != Phase::live || !m_alive.contains(playerId))
+            return false;
         return m_economy.dropWeapon(room, playerId, action);
+    }
     if (action == 0)
     {
         if (m_actionPlayer == playerId)
@@ -160,6 +164,14 @@ bool BombMode::onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t 
         return true;
     }
     return false;
+}
+
+bool BombMode::pickupWeapon(nexilis::server::Room& room, uint64_t id, uint8_t slot,
+                            const std::string& weapon)
+{
+    std::lock_guard lock(m_mutex);
+    return m_phase == Phase::live && m_alive.contains(id) &&
+           m_economy.pickupWeapon(room, id, slot, weapon);
 }
 
 void BombMode::onPlayerDeath(nexilis::server::Room& room, uint64_t killerId, uint64_t victimId)
@@ -272,6 +284,7 @@ void BombMode::startRound(nexilis::server::Room& room)
     for (auto id : m_players)
     {
         room.resetPlayerHealth(id);
+        room.spawnPlayer(id);
         m_economy.respawned(room, id);
         auto* user = nexilis::server::ClientStorage::getClientById(id);
         if (!user)

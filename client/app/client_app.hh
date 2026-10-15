@@ -127,17 +127,7 @@ public:
     nexilis::TCPClient tcp_client;
     nexilis::UDPClient udp_client;
     std::atomic<bool> ready{false};
-    struct PendingWeaponThrow
-    {
-        glm::vec3 position;
-        glm::vec3 direction;
-    };
-    std::optional<PendingWeaponThrow> pending_weapon_throw;
-    glm::vec3 last_sent_position{0.0f};
-    float last_sent_yaw = 0.0f;
-    float pose_send_elapsed = 1.0f;
-    float fall_pose_send_elapsed = 0.5f;
-    bool was_below_fall_plane = false;
+    float input_send_elapsed = 1.0f;
     std::mutex mtx;
     std::vector<nexilis::RoomInfo> rooms;
     std::atomic<bool> joiningRoom{false};
