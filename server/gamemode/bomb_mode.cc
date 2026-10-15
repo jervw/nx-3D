@@ -1,5 +1,6 @@
 #include <server/gamemode/bomb_mode.hh>
 #include <shared/bomb_sites.hh>
+#include <shared/bomb_damage.hh>
 #include <shared/player_rules.hh>
 
 #include <nexilis/command_type.hh>
@@ -97,7 +98,8 @@ void BombMode::onTeamSelected(nexilis::server::Room& room, uint64_t playerId)
 bool BombMode::canDamage(uint64_t shooterId, uint64_t targetId) const
 {
     std::lock_guard lock(m_mutex);
-    return m_phase == Phase::live && m_alive.contains(shooterId) && m_alive.contains(targetId);
+    return (m_phase == Phase::live || m_phase == Phase::post) &&
+           m_alive.contains(shooterId) && m_alive.contains(targetId);
 }
 
 bool BombMode::canSelectTeam(uint64_t playerId) const
@@ -145,7 +147,8 @@ bool BombMode::onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t 
                              m_phase == Phase::live && m_alive.contains(playerId));
     if (action == nx3d::economy::kThrowGrenadeAction || action == nx3d::economy::kThrowSmokeAction)
         return m_economy.throwGrenade(room, playerId,
-                                     m_phase == Phase::live && m_alive.contains(playerId),
+                                     (m_phase == Phase::live || m_phase == Phase::post) &&
+                                             m_alive.contains(playerId),
                                      action == nx3d::economy::kThrowSmokeAction);
     if (action == nx3d::economy::kDropPrimaryAction ||
         action == nx3d::economy::kDropSecondaryAction)
@@ -188,8 +191,22 @@ bool BombMode::pickupWeapon(nexilis::server::Room& room, uint64_t id, uint8_t sl
 void BombMode::onPlayerDeath(nexilis::server::Room& room, uint64_t killerId, uint64_t victimId)
 {
     std::lock_guard lock(m_mutex);
-    if (m_phase != Phase::live || !m_alive.erase(victimId))
+    if ((m_phase != Phase::live && m_phase != Phase::post) || !m_alive.contains(victimId))
         return;
+    recordDeath(room, killerId, victimId);
+    if (m_phase == Phase::live)
+    {
+        if (!teamAlive(room, kCT))
+            endRound(room, true, "Counter Terrorists eliminated");
+        else if (!teamAlive(room, kT) && !m_planted)
+            endRound(room, false, "Terrorists eliminated");
+    }
+    publish(room);
+}
+
+void BombMode::recordDeath(nexilis::server::Room& room, uint64_t killerId, uint64_t victimId)
+{
+    m_alive.erase(victimId);
     if (m_actionPlayer == victimId)
         clearAction();
     m_economy.died(room, killerId, victimId);
@@ -203,10 +220,37 @@ void BombMode::onPlayerDeath(nexilis::server::Room& room, uint64_t killerId, uin
                         room, killerId == 0 ? std::vector<uint64_t>{victimId}
                                             : std::vector<uint64_t>{killerId, victimId}),
                 0));
-    if (!teamAlive(room, kCT))
-        endRound(room, true, "Counter Terrorists eliminated");
-    else if (!teamAlive(room, kT) && !m_planted)
-        endRound(room, false, "Terrorists eliminated");
+}
+
+void BombMode::applyBombExplosionDamage(nexilis::server::Room& room)
+{
+    // This runs after endRound, so the result is fixed before blast deaths arrive.
+    for (auto id : std::vector<uint64_t>(m_alive.begin(), m_alive.end()))
+    {
+        auto* victim = nexilis::server::ClientStorage::getClientById(id);
+        if (!victim || room.getPlayerHealth(id) <= 0.0f)
+            continue;
+        const auto pos = victim->getObject3D().getPosition();
+        const float dx = pos.x - m_bombX;
+        const float dy = standingEyeY(pos.y, victim->getObject3D().getDimensions().y) - m_bombY;
+        const float dz = pos.z - m_bombZ;
+        const float damage = nx3d::bombBlastDamage(std::sqrt(dx * dx + dy * dy + dz * dz));
+        if (damage <= 0.0f)
+            continue;
+        const bool killed = room.damagePlayer(id, damage);
+        nexilis::nx_data data{
+                static_cast<uint8_t>(nexilis::CommandType::room),
+                static_cast<uint8_t>(nexilis::RoomCommandType::Root::player_3D),
+                static_cast<uint8_t>(nexilis::RoomCommandType::PlayerType::shoot)};
+        nexilis::server::Command::ClientMsgType params{
+                {"target_id", boost::json::value(id)},
+                {"damage", boost::json::value(static_cast<double>(damage))},
+                {"new_health", boost::json::value(static_cast<double>(room.getPlayerHealth(id)))}};
+        room.broadcastToAll(nexilis::server::Command::createRoomCommand(
+                room.getId(), *victim, data, params, 0));
+        if (killed)
+            recordDeath(room, 0, id);
+    }
     publish(room);
 }
 
@@ -382,7 +426,12 @@ void BombMode::update(nexilis::server::Room& room, float dt)
             else if (!teamAlive(room, kT) && !m_planted)
                 endRound(room, false, "Terrorists eliminated");
             else if (m_seconds <= 0.0f)
-                endRound(room, m_planted, m_planted ? "Bomb exploded" : "Time expired");
+            {
+                const bool exploded = m_planted;
+                endRound(room, exploded, exploded ? "Bomb exploded" : "Time expired");
+                if (exploded)
+                    applyBombExplosionDamage(room);
+            }
         }
     }
     else if (m_phase == Phase::post)

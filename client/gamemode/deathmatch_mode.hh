@@ -79,6 +79,7 @@ protected:
     glm::vec3 m_pickedUpItemSize{1.0f};
     std::string m_pickedUpItemType;
     int m_health = 100;
+    float m_hurtSoundCooldown = 0.0f;
     int m_hitmarkerFrames = 0;
     std::string m_weaponName;
     struct GunSlot

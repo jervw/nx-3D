@@ -132,6 +132,12 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
     bomb_beep_audio->setSpatialRange(900.0f, 2500.0f);
     explosion_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/explosion.wav"));
+    terrorists_win_audio = std::make_unique<spear::audio::Sound>(
+            audio_system, nx3d::projectAssetPath("sounds/terrorists_win.wav"));
+    counter_terrorists_win_audio = std::make_unique<spear::audio::Sound>(
+            audio_system, nx3d::projectAssetPath("sounds/counter_terrorists_win.wav"));
+    hurt_audio = std::make_unique<spear::audio::Sound>(
+            audio_system, nx3d::projectAssetPath("sounds/hurt.wav"));
     smoke_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/smoke.wav"));
     walk_audio = std::make_unique<spear::audio::Sound>(
@@ -380,6 +386,12 @@ void ClientApp::applyAudioVolume()
         bomb_beep_audio->setVolume(0.6f * std::sqrt(audioVolume));
     if (explosion_audio)
         explosion_audio->setVolume(std::min(1.0f, 2.5f * std::sqrt(audioVolume)));
+    if (terrorists_win_audio)
+        terrorists_win_audio->setVolume(0.8f * std::sqrt(audioVolume));
+    if (counter_terrorists_win_audio)
+        counter_terrorists_win_audio->setVolume(0.8f * std::sqrt(audioVolume));
+    if (hurt_audio)
+        hurt_audio->setVolume(0.8f * std::sqrt(audioVolume));
     if (smoke_audio)
         smoke_audio->setVolume(0.65f * audioVolume);
     if (walk_audio)

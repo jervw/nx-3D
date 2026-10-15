@@ -56,7 +56,7 @@ void BombMode::onEnter(ClientApp& app, const std::string& team)
 
 void BombMode::update(ClientApp& app, float dt)
 {
-    if (!m_active || !m_alive || m_phase != "live")
+    if (!m_active || !m_alive || (m_phase != "live" && m_phase != "post"))
         m_triggerHeld = false;
     DeathmatchMode::update(app, dt);
 
@@ -71,6 +71,13 @@ void BombMode::update(ClientApp& app, float dt)
                                   event.notice == "T win: Bomb exploded";
         if (bombExploded && app.explosion_audio)
             app.explosion_audio->play();
+        if (m_phase == "live" && event.phase == "post")
+        {
+            if (event.notice.starts_with("T win: ") && app.terrorists_win_audio)
+                app.terrorists_win_audio->play();
+            else if (event.notice.starts_with("CT win: ") && app.counter_terrorists_win_audio)
+                app.counter_terrorists_win_audio->play();
+        }
         m_round = event.round;
         m_tScore = event.terrorist_score;
         m_ctScore = event.counter_terrorist_score;
@@ -209,7 +216,7 @@ void BombMode::update(ClientApp& app, float dt)
 
 void BombMode::handleMouseButtonDown(ClientApp& app, const SDL_Event& event)
 {
-    if (m_active && m_alive && m_phase == "live")
+    if (m_active && m_alive && (m_phase == "live" || m_phase == "post"))
         DeathmatchMode::handleMouseButtonDown(app, event);
 }
 

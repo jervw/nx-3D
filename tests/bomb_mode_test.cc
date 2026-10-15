@@ -1,6 +1,7 @@
 #include <server/gamemode/game_mode_registry.hh>
 #include <shared/economy.hh>
 #include <shared/bomb_sites.hh>
+#include <shared/bomb_damage.hh>
 #include <shared/player_rules.hh>
 
 #include <nexilis/client/client_api.hh>
@@ -9,6 +10,7 @@
 #include <nexilis/server/command/command.hh>
 #include <nexilis/server/room_storage.hh>
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 
@@ -23,6 +25,11 @@ void check(bool ok, const char* reason)
 
 int main()
 {
+    check(nx3d::bombBlastDamage(0.0f) == nx3d::kBombMaxDamage &&
+                  nx3d::bombBlastDamage(nx3d::kBombBlastRadius / 2.0f) ==
+                          nx3d::kBombMaxDamage / 2.0f &&
+                  nx3d::bombBlastDamage(nx3d::kBombBlastRadius) == 0.0f,
+          "Bomb blast damage did not fall off with distance");
     using namespace nexilis;
     using nx3d::server::gamemode::GameModeRegistry;
     client::ClientConfig config;
@@ -174,7 +181,7 @@ int main()
     auto eliminated = t.consumeMatchEvents();
     check(bomb(eliminated).terrorist_score == 1,
           "Elimination did not score");
-    check(!room->canDamage(10, 20), "Post-round shooting allowed");
+    check(!room->canDamage(10, 20), "Dead player could take post-round damage");
 
     // Finish the first half, then verify the MR12 side swap and score mapping.
     for (int round = 3; round <= 12; ++round)
@@ -197,10 +204,27 @@ int main()
     secondT->getObject3D().setPosition(Vector3f{-1600.0f, 64.0f, -2700.0f});
     check(room->onPlayerAction(20, 1), "Second-half plant at B rejected");
     GameModeRegistry::update(3.1f);
+    tUser->getObject3D().setPosition(Vector3f{-1000.0f, 64.0f, -2700.0f});
+    server::ClientStorage::getClientById(30)->getObject3D().setPosition(
+            Vector3f{0.0f, 64.0f, 0.0f});
     GameModeRegistry::update(40.1f);
     auto exploded = t.consumeMatchEvents();
     check(bomb(exploded).terrorist_score == 2,
           "Explosion did not score");
+    check(room->getPlayerHealth(20) == 0.0f, "Bomb did not kill player at its center");
+    check(room->getPlayerHealth(10) > 0.0f && room->getPlayerHealth(10) < 100.0f,
+          "Bomb did not partially damage nearby player");
+    check(room->getPlayerHealth(30) == 100.0f, "Bomb damaged distant player");
+    auto blastEvents = t.consumeDamageEvents();
+    check(std::any_of(blastEvents.begin(), blastEvents.end(), [](const auto& event)
+                      { return event.target_id == 10 && event.damage > 0.0f; }),
+          "Bomb damage event did not reach clients");
+    check(room->canDamage(30, 10), "Living players could not deal post-round damage");
+    check(room->damagePlayer(10, 100.0f), "Post-round hit did not kill");
+    room->onPlayerDied(30, 10);
+    auto postHit = t.consumeMatchEvents();
+    check(bomb(postHit).terrorist_score == 2 && room->getPlayerHealth(10) == 0.0f,
+          "Post-round death changed the round result");
 
     GameModeRegistry::clear();
     server::RoomStorage::clear();

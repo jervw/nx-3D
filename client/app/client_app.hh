@@ -105,6 +105,9 @@ public:
     std::unique_ptr<spear::audio::Sound> defusing_audio;
     std::unique_ptr<spear::audio::Sound> bomb_beep_audio;
     std::unique_ptr<spear::audio::Sound> explosion_audio;
+    std::unique_ptr<spear::audio::Sound> terrorists_win_audio;
+    std::unique_ptr<spear::audio::Sound> counter_terrorists_win_audio;
+    std::unique_ptr<spear::audio::Sound> hurt_audio;
     std::unique_ptr<spear::audio::Sound> smoke_audio;
     std::unique_ptr<spear::audio::Sound> walk_audio;
     /// Short positional "step" clip for sounds other players make when

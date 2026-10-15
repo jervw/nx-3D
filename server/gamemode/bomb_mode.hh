@@ -46,6 +46,8 @@ private:
     void publish(nexilis::server::Room& room);
     void startRound(nexilis::server::Room& room);
     void endRound(nexilis::server::Room& room, bool terroristsWin, const std::string& reason);
+    void applyBombExplosionDamage(nexilis::server::Room& room);
+    void recordDeath(nexilis::server::Room& room, uint64_t killerId, uint64_t victimId);
     void reconcile(nexilis::server::Room& room);
     bool teamAlive(nexilis::server::Room& room, const std::string& team) const;
     bool closeToBomb(uint64_t playerId) const;

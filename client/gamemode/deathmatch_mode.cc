@@ -59,6 +59,7 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
     app.tcp_client.sendMessage(packet::Room::Player3D::setTeam(app.client_api, team));
 
     m_health = 100;
+    m_hurtSoundCooldown = 0.0f;
     app.ui->healthText.setString("HP: " + std::to_string(m_health));
     app.ui->wastedText.setString("");
     m_prevCamPos = app.camera.getPosition();
@@ -72,6 +73,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
     using packet = nexilis::client::Packet;
 
     m_fireCooldown = std::max(0.0f, m_fireCooldown - delta_time);
+    m_hurtSoundCooldown = std::max(0.0f, m_hurtSoundCooldown - delta_time);
     for (auto it = m_grenadeVisuals.begin(); it != m_grenadeVisuals.end();)
     {
         it->age += delta_time;
@@ -192,6 +194,11 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
     {
         if (evt.target_id == app.client_api.getClientId())
         {
+            if (evt.damage > 0.0f && m_hurtSoundCooldown <= 0.0f && app.hurt_audio)
+            {
+                app.hurt_audio->play();
+                m_hurtSoundCooldown = 0.35f;
+            }
             m_health = static_cast<int>(evt.new_health);
             if (m_health < 0)
                 m_health = 0;
@@ -237,6 +244,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             if (m_firstPersonGun)
                 m_firstPersonGun->resetAnimation();
             m_health = 100;
+            m_hurtSoundCooldown = 0.0f;
             app.ui->healthText.setString("HP: " + std::to_string(m_health));
             app.ui->wastedText.setString("");
             m_reloadRemaining = 0.0f;
