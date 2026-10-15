@@ -1,6 +1,8 @@
 #ifndef NX3D_SHARED_PLAYER_HIT_HH
 #define NX3D_SHARED_PLAYER_HIT_HH
 
+#include <shared/player_rules.hh>
+
 #include <glm/glm.hpp>
 
 #include <algorithm>
@@ -10,9 +12,11 @@
 namespace nx3d
 {
 
-// The figure origin is at eye height, with boots 64 units below it.
+// The figure origin is at eye height; boots stay at the same floor height
+// when the player crouches.
 inline float playerHitDistance(const glm::vec3& origin, const glm::vec3& direction,
-                               const glm::vec3& playerPosition, float yaw)
+                               const glm::vec3& playerPosition, float yaw,
+                               float eyeHeight = kStandingEyeHeight)
 {
     const float c = std::cos(yaw);
     const float s = std::sin(yaw);
@@ -21,7 +25,7 @@ inline float playerHitDistance(const glm::vec3& origin, const glm::vec3& directi
                                 s * offset.x + c * offset.z);
     const glm::vec3 localDirection(c * direction.x - s * direction.z, direction.y,
                                    s * direction.x + c * direction.z);
-    const glm::vec3 boxMin(-18.0f, -64.0f, -9.0f);
+    const glm::vec3 boxMin(-18.0f, -eyeHeight, -9.0f);
     const glm::vec3 boxMax(18.0f, 12.0f, 9.0f);
 
     float nearDistance = -std::numeric_limits<float>::infinity();

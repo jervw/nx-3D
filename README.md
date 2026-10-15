@@ -88,6 +88,8 @@ The flake also exposes packaged programs through `nix run .#server` and `nix run
 | ------------------------------------------ | --------------------------------------------------------- |
 | Move and look                              | WASD and mouse                                            |
 | Jump                                       | Space                                                     |
+| Crouch slowly without footsteps            | Hold Ctrl                                                 |
+| Walk slowly without footsteps              | Hold Shift                                                |
 | Fire                                       | Hold left mouse button                                    |
 | Reload                                     | R                                                         |
 | Equip primary, secondary, knife, HE, smoke | 1, 2, 3, 4, 5                                             |
@@ -109,7 +111,7 @@ The AK-47, M16, Glock, USP, Desert Eagle, MP5, knife, and HE grenade have low-po
 The AK-47 uses a black polymer and metal palette; the M16 uses charcoal and
 gunmetal. Their materials use generated 1-pixel swatch textures.
 
-Other players appear as custom low-poly OBJ figures: a blue armored Counter Terrorist and a tan Terrorist with a head wrap and utility vest. The figures and their texture atlases live in `assets/players/`; see its README for the generator and dimensions. Figures update when a player's team becomes known or changes. The server tests shots against a fixed box spanning each figure from headgear to boots.
+Other players appear as custom low-poly OBJ figures: a blue armored Counter Terrorist and a tan Terrorist with a head wrap and utility vest. The figures and their texture atlases live in `assets/players/`; see its README for the generator and dimensions. Figures update when a player's team becomes known or changes. The server tests shots against a box spanning each figure from headgear to boots, shortened when crouching.
 
 The rifles and MP5 fire automatically while held; pistols fire once per click. R reloads a partly empty magazine from a finite reserve of three magazines. Reloading stops when the reserve is empty, and the HUD shows magazine and reserve rounds. The server tracks ammunition for hit validation and preserves it in dropped guns; the HUD tracks a local prediction. Buying an ammo refill restores both equipped weapon slots. Dead players see a red and black WASTED screen and cannot move or turn until respawning. Deathmatch respawns take 2 seconds; bomb rounds have a 4-second break. Fallen player models tumble under Bullet physics. A respawn or new bomb round issues a fresh weapon and reserve.
 

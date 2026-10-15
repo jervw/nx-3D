@@ -29,7 +29,7 @@ namespace nx3d::server::gamemode
 {
 namespace
 {
-constexpr float kEyeHeight = 64.0f;
+constexpr float kEyeHeight = nx3d::kStandingEyeHeight;
 constexpr float kStepHeight = 24.0f;
 constexpr float kRadius = 7.68f;
 constexpr float kGravity = -800.0f;
@@ -44,6 +44,18 @@ glm::vec3 asGlm(const nexilis::Vector3f& v)
 {
     return {v.x, v.y, v.z};
 }
+
+struct ContactCheck : btCollisionWorld::ContactResultCallback
+{
+    bool blocked = false;
+
+    btScalar addSingleResult(btManifoldPoint&, const btCollisionObjectWrapper*, int, int,
+                             const btCollisionObjectWrapper*, int, int) override
+    {
+        blocked = true;
+        return 0.0f;
+    }
+};
 
 class MapPhysics
 {
@@ -115,17 +127,47 @@ public:
     }
 
     void advance(glm::vec3& position, const glm::vec3& direction, bool jump,
+                 bool crouchRequested, bool silentWalk, bool& crouched,
                  bool& jumpHeld, bool& grounded, float& verticalVelocity, float dt)
     {
         std::lock_guard lock(m_mutex);
+        if (crouchRequested && !crouched)
+        {
+            position.y -= kEyeHeight - nx3d::kCrouchingEyeHeight;
+            crouched = true;
+        }
+        else if (!crouchRequested && crouched)
+        {
+            const float totalHeight = kEyeHeight * 0.9f;
+            const float feetY = position.y - nx3d::kCrouchingEyeHeight;
+            btCapsuleShape capsule(kRadius, totalHeight - 2.0f * kRadius);
+            btCollisionObject standing;
+            standing.setCollisionShape(&capsule);
+            btTransform transform;
+            transform.setIdentity();
+            transform.setOrigin(btVector3(position.x,
+                                          feetY + kEyeHeight * 0.15f + totalHeight * 0.5f,
+                                          position.z));
+            standing.setWorldTransform(transform);
+            ContactCheck contacts;
+            m_world.contactTest(&standing, contacts);
+            if (!contacts.blocked)
+            {
+                position.y += kEyeHeight - nx3d::kCrouchingEyeHeight;
+                crouched = false;
+            }
+        }
+        const float eyeHeight = crouched ? nx3d::kCrouchingEyeHeight : kEyeHeight;
         const float previousHeadY = position.y;
         const bool wasGrounded = grounded;
         if (glm::length(glm::vec2(direction.x, direction.z)) > 0.0f)
         {
-            glm::vec3 target = position + direction * kWalkSpeed * dt;
-            const float capsuleY = position.y - kEyeHeight + kEyeHeight * 0.15f +
-                                   kEyeHeight * 0.9f * 0.5f;
-            btCapsuleShape capsule(kRadius, kEyeHeight * 0.9f - 2.0f * kRadius);
+            const float speed = crouched ? nx3d::kCrouchSpeed : silentWalk ? nx3d::kSilentWalkSpeed
+                                                                           : nx3d::kWalkSpeed;
+            glm::vec3 target = position + direction * speed * dt;
+            const float capsuleY = position.y - eyeHeight + eyeHeight * 0.15f +
+                                   eyeHeight * 0.9f * 0.5f;
+            btCapsuleShape capsule(kRadius, eyeHeight * 0.9f - 2.0f * kRadius);
             btTransform from, to;
             from.setIdentity();
             to.setIdentity();
@@ -151,11 +193,11 @@ public:
                         if (!raised.hasHit())
                         {
                             auto ground = groundY(target.x, target.z, position.y + kStepHeight,
-                                                  position.y - kEyeHeight - 1.0f);
-                            if (ground && *ground - (position.y - kEyeHeight) > 0.1f &&
-                                *ground - (position.y - kEyeHeight) <= kStepHeight + 0.1f)
+                                                  position.y - eyeHeight - 1.0f);
+                            if (ground && *ground - (position.y - eyeHeight) > 0.1f &&
+                                *ground - (position.y - eyeHeight) <= kStepHeight + 0.1f)
                             {
-                                target.y = *ground + kEyeHeight;
+                                target.y = *ground + eyeHeight;
                                 verticalVelocity = 0.0f;
                                 stepped = true;
                             }
@@ -194,7 +236,7 @@ public:
             position = target;
         }
 
-        if (jump && !jumpHeld && grounded)
+        if (jump && !jumpHeld && grounded && !crouched)
         {
             verticalVelocity = kJumpSpeed;
             grounded = false;
@@ -228,17 +270,17 @@ public:
         {
             auto hit = groundY(position.x + probe[0], position.z + probe[1],
                                std::max(previousHeadY, position.y),
-                               position.y - kEyeHeight - kStepHeight);
+                               position.y - eyeHeight - kStepHeight);
             const float allowedRise = wasGrounded ? kStepHeight + 0.1f : 0.1f;
-            if (hit && *hit <= previousHeadY - kEyeHeight + allowedRise &&
+            if (hit && *hit <= previousHeadY - eyeHeight + allowedRise &&
                 (!ground || *hit > *ground))
                 ground = hit;
         }
-        const float feetY = position.y - kEyeHeight;
+        const float feetY = position.y - eyeHeight;
         if (ground && verticalVelocity <= 0.0f &&
             (feetY <= *ground + 0.1f || (wasGrounded && feetY - *ground <= kStepHeight)))
         {
-            position.y = *ground + kEyeHeight;
+            position.y = *ground + eyeHeight;
             verticalVelocity = 0.0f;
             grounded = true;
         }
@@ -283,6 +325,15 @@ void publishPosition(nexilis::server::Room& room, nexilis::server::User& user)
     room.broadcastToAll(nexilis::server::Command::createRoomCommand(
             room.getId(), user, data,
             {{"x", pos.x}, {"y", pos.y}, {"z", pos.z}, {"yaw", user.getObject3D().getYaw()}}, 0));
+}
+
+void publishStance(nexilis::server::Room& room, nexilis::server::User& user, bool crouched)
+{
+    const float height = crouched ? nx3d::kCrouchingEyeHeight : nx3d::kStandingEyeHeight;
+    user.getObject3D().setDimensions({36.0f, height, 18.0f});
+    room.broadcastToAll(nexilis::server::Command::clientMessageData(
+            nexilis::CommandType::room, "player_3D", 0,
+            {{"action", "dimensions"}, {"room_id", room.getId()}, {"client_id", user.getId()}, {"x", 36.0f}, {"y", height}, {"z", 18.0f}}));
 }
 
 struct WeaponRule
@@ -339,6 +390,7 @@ void Authority::spawn(nexilis::server::Room& room, uint64_t playerId)
         state.lastInput = std::chrono::steady_clock::now();
     }
     user->getObject3D().setPosition({point.x, point.y, point.z});
+    publishStance(room, *user, false);
     publishPosition(room, *user);
 }
 
@@ -364,7 +416,13 @@ bool Authority::move(nexilis::server::Room& room, uint64_t playerId,
     auto it = m_players.find(playerId);
     if (it == m_players.end())
         return true;
-    it->second.input = {direction.x, input.y > 0.5f ? 1.0f : 0.0f, direction.z};
+    // Older clients used Y as a jump boolean. Keep accepting their packets,
+    // including the oversized test input that exercises speed clamping.
+    const uint8_t flags = input.y >= 0.0f && input.y <= 7.0f &&
+                                          std::floor(input.y) == input.y
+                                  ? static_cast<uint8_t>(input.y)
+                                  : (input.y > 0.5f ? nx3d::kMoveJump : 0);
+    it->second.input = {direction.x, static_cast<float>(flags), direction.z};
     it->second.yaw = std::remainder(yaw, 6.2831853f);
     it->second.lastInput = std::chrono::steady_clock::now();
     return true;
@@ -380,6 +438,8 @@ void Authority::update(nexilis::server::Room& room, float dt)
         if (!user || user->getRoomId() != room.getId() ||
             room.getPlayerTeam(playerId).empty() || room.getPlayerHealth(playerId) <= 0.0f)
             continue;
+        bool stanceChanged = false;
+        bool crouched = false;
         {
             std::lock_guard lock(m_mutex);
             auto it = m_players.find(playerId);
@@ -387,11 +447,19 @@ void Authority::update(nexilis::server::Room& room, float dt)
                 continue;
             auto& state = it->second;
             const bool fresh = now - state.lastInput < std::chrono::milliseconds(250);
-            const glm::vec3 direction = fresh ? asGlm(state.input) : glm::vec3(0);
-            const bool jump = fresh && state.input.y > 0.5f;
+            const glm::vec3 direction = fresh ? glm::vec3(state.input.x, 0.0f, state.input.z)
+                                              : glm::vec3(0.0f);
+            const auto flags = fresh ? static_cast<uint8_t>(state.input.y)
+                                     : static_cast<uint8_t>(state.crouched ? nx3d::kMoveCrouch : 0);
+            const bool jump = (flags & nx3d::kMoveJump) != 0;
+            const bool crouch = (flags & nx3d::kMoveCrouch) != 0;
+            const bool silentWalk = (flags & nx3d::kMoveSilentWalk) != 0;
             auto position = asGlm(user->getObject3D().getPosition());
-            mapPhysics().advance(position, direction, jump,
+            const bool wasCrouched = state.crouched;
+            mapPhysics().advance(position, direction, jump, crouch, silentWalk, state.crouched,
                                  state.jumpHeld, state.grounded, state.verticalVelocity, dt);
+            stanceChanged = state.crouched != wasCrouched;
+            crouched = state.crouched;
             position.x = std::clamp(position.x, -nx3d::kMaxHorizontalPosition,
                                     nx3d::kMaxHorizontalPosition);
             position.z = std::clamp(position.z, -nx3d::kMaxHorizontalPosition,
@@ -401,6 +469,8 @@ void Authority::update(nexilis::server::Room& room, float dt)
             user->getObject3D().setPosition({position.x, position.y, position.z});
             user->getObject3D().setYaw(state.yaw);
         }
+        if (stanceChanged)
+            publishStance(room, *user, crouched);
         publishPosition(room, *user);
     }
 }
@@ -523,8 +593,16 @@ std::optional<nexilis::server::Room::ShotHit> Authority::fire(
         if (!target)
             continue;
         const auto position = target->getObject3D().getPosition();
+        bool targetCrouched = false;
+        {
+            std::lock_guard lock(m_mutex);
+            if (auto it = m_players.find(id); it != m_players.end())
+                targetCrouched = it->second.crouched;
+        }
         const float distance = nx3d::playerHitDistance(origin, aim, asGlm(position),
-                                                       target->getObject3D().getYaw());
+                                                       target->getObject3D().getYaw(),
+                                                       targetCrouched ? nx3d::kCrouchingEyeHeight
+                                                                      : nx3d::kStandingEyeHeight);
         if (distance < closest)
         {
             closest = distance;

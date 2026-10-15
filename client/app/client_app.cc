@@ -55,7 +55,7 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
       scene_manager(),
       bullet_world(),
       shared_world(std::make_shared<btDiscreteDynamicsWorld>(*bullet_world.getDynamicsWorld())),
-      movement_controller(camera, shared_world.get(), 64.0f),
+      movement_controller(camera, shared_world.get(), nx3d::kStandingEyeHeight),
       renderer(window),
       serverAddress(initialServerAddress),
       username(initialUsername.empty() ? "username_" + std::to_string(nexilis::Util::getRandomInt(1000000, 9999999)) : initialUsername),
@@ -64,6 +64,9 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
       udp_client(client_api)
 {
     using packet = nexilis::client::Packet;
+    movement_controller.setMovementModifiers(
+            nx3d::kCrouchingEyeHeight, nx3d::kCrouchSpeed / nx3d::kWalkSpeed,
+            nx3d::kSilentWalkSpeed / nx3d::kWalkSpeed);
 
     auto w_size = window.getSize();
     std::cout << "Window size x: " << w_size.x << " y: " << w_size.y << std::endl;
@@ -1227,7 +1230,9 @@ void ClientApp::run()
         {
             static const std::unordered_map<SDL_Keycode, bool> noMovementKeys = {
                     {SDLK_W, false}, {SDLK_S, false}, {SDLK_A, false},
-                    {SDLK_D, false}, {SDLK_SPACE, false}};
+                    {SDLK_D, false}, {SDLK_SPACE, false},
+                    {SDLK_LSHIFT, false}, {SDLK_RSHIFT, false},
+                    {SDLK_LCTRL, false}, {SDLK_RCTRL, false}};
             movement_controller.processInput(noMovementKeys, delta_time);
         }
 
@@ -1258,11 +1263,17 @@ void ClientApp::run()
                         direction = glm::normalize(direction);
                 }
                 const float yaw = std::atan2(-front.x, -front.z);
+                uint8_t flags = 0;
+                if (canMove && eventHandler.movementKeyDown(SDLK_SPACE))
+                    flags |= nx3d::kMoveJump;
+                if (movement_controller.isCrouched())
+                    flags |= nx3d::kMoveCrouch;
+                if (canMove && (eventHandler.movementKeyDown(SDLK_LSHIFT) ||
+                                eventHandler.movementKeyDown(SDLK_RSHIFT)))
+                    flags |= nx3d::kMoveSilentWalk;
                 udp_client.sendMessage(packet::Room::Player3D::movement(
                         client_api,
-                        nexilis::Vector3f({direction.x,
-                                           canMove && eventHandler.movementKeyDown(SDLK_SPACE) ? 1.0f : 0.0f,
-                                           direction.z}),
+                        nexilis::Vector3f({direction.x, static_cast<float>(flags), direction.z}),
                         0.0f, yaw));
                 input_send_elapsed = 0.0f;
             }
@@ -1542,6 +1553,9 @@ void ClientApp::syncRemotePlayerTransforms(float deltaTime)
                                glm::vec3(1.0f, 0.0f, 0.0f));
             pose = glm::rotate(pose, std::sin(motion.stride) * 0.035f * motion.speed + std::sin(motion.hitTime / 0.22f * 3.14159f) * 0.14f,
                                glm::vec3(0.0f, 0.0f, 1.0f));
+            if (std::abs(player.h - nx3d::kCrouchingEyeHeight) < 1.0f)
+                pose = glm::scale(pose, glm::vec3(1.0f, nx3d::kCrouchingEyeHeight /
+                                                        nx3d::kStandingEyeHeight, 1.0f));
             it->second->setModel(pose);
 
             auto name = playerNames.find(player.id);

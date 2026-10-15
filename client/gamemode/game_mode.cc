@@ -40,7 +40,10 @@ void GameMode::updateWalkSound(ClientApp& app, float horizontalSpeed, float delt
     // 40.0f engine units/s: full walk is ~280, so this triggers on real
     // movement while staying quiet against near-zero camera jitter.
     constexpr float kMinWalkSpeed = 40.0f;
-    const bool moving = horizontalSpeed >= kMinWalkSpeed;
+    const bool quiet = app.movement_controller.isCrouched() ||
+                       app.eventHandler.movementKeyDown(SDLK_LSHIFT) ||
+                       app.eventHandler.movementKeyDown(SDLK_RSHIFT);
+    const bool moving = horizontalSpeed >= kMinWalkSpeed && !quiet;
 
     if (moving)
     {

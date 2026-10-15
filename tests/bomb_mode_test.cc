@@ -1,6 +1,7 @@
 #include <server/gamemode/game_mode_registry.hh>
 #include <shared/economy.hh>
 #include <shared/bomb_sites.hh>
+#include <shared/player_rules.hh>
 
 #include <nexilis/client/client_api.hh>
 #include <nexilis/command_type.hh>
@@ -139,6 +140,11 @@ int main()
           "Queued player moved before being admitted");
 
     check(!room->onPlayerAction(10, 1), "Plant outside a bombsite was accepted");
+    tUser->getObject3D().setDimensions(Vector3f{36.0f, nx3d::kCrouchingEyeHeight, 18.0f});
+    tUser->getObject3D().setPosition(Vector3f{1152.0f, 106.0f, -2416.0f});
+    check(room->onPlayerAction(10, 1), "Crouched player could not plant at the bombsite edge");
+    check(room->onPlayerAction(10, 0), "Crouched plant could not be canceled");
+    tUser->getObject3D().setDimensions(Vector3f{36.0f, nx3d::kStandingEyeHeight, 18.0f});
     tUser->getObject3D().setPosition(Vector3f{1152.0f, 160.0f, -2416.0f});
     check(room->onPlayerAction(10, 1), "Plant at A was rejected");
     GameModeRegistry::update(1.5f);

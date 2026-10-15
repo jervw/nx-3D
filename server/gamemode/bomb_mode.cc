@@ -1,5 +1,6 @@
 #include <server/gamemode/bomb_mode.hh>
 #include <shared/bomb_sites.hh>
+#include <shared/player_rules.hh>
 
 #include <nexilis/command_type.hh>
 #include <nexilis/room_command_type.hh>
@@ -23,6 +24,12 @@ constexpr float kPlantSeconds = 3.0f;
 constexpr float kDefuseSeconds = 5.0f;
 constexpr float kBetweenSeconds = 4.0f;
 constexpr float kDefuseRange = 120.0f;
+float standingEyeY(float eyeY, float playerHeight)
+{
+    return eyeY + (playerHeight == nx3d::kCrouchingEyeHeight
+                           ? nx3d::kStandingEyeHeight - nx3d::kCrouchingEyeHeight
+                           : 0.0f);
+}
 } // namespace
 
 void BombMode::publish(nexilis::server::Room& room)
@@ -113,7 +120,9 @@ bool BombMode::closeToBomb(uint64_t playerId) const
     if (!user)
         return false;
     auto pos = user->getObject3D().getPosition();
-    const float dx = pos.x - m_bombX, dy = pos.y - m_bombY, dz = pos.z - m_bombZ;
+    const float dx = pos.x - m_bombX;
+    const float dy = standingEyeY(pos.y, user->getObject3D().getDimensions().y) - m_bombY;
+    const float dz = pos.z - m_bombZ;
     return dx * dx + dy * dy + dz * dz <= kDefuseRange * kDefuseRange;
 }
 
@@ -123,7 +132,9 @@ bool BombMode::inBombSite(uint64_t playerId) const
     if (!user)
         return false;
     const auto pos = user->getObject3D().getPosition();
-    return nx3d::bomb_sites::at(pos.x, pos.y, pos.z) != nullptr;
+    return nx3d::bomb_sites::at(pos.x,
+                                standingEyeY(pos.y, user->getObject3D().getDimensions().y),
+                                pos.z) != nullptr;
 }
 
 bool BombMode::onAction(nexilis::server::Room& room, uint64_t playerId, uint8_t action)
@@ -343,7 +354,7 @@ void BombMode::update(nexilis::server::Room& room, float dt)
                     {
                         auto pos = user->getObject3D().getPosition();
                         m_bombX = pos.x;
-                        m_bombY = pos.y;
+                        m_bombY = standingEyeY(pos.y, user->getObject3D().getDimensions().y);
                         m_bombZ = pos.z;
                         m_planted = true;
                         m_seconds = kBombSeconds;

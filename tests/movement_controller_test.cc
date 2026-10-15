@@ -38,6 +38,56 @@ int main()
         return 1;
     }
 
+    movement.setMovementModifiers(40.0f, 0.4f, 0.5f);
+    auto quietWalk = keys;
+    quietWalk[SDLK_LSHIFT] = true;
+    quietWalk[SDLK_W] = true;
+    const auto beforeQuietWalk = camera.getPosition();
+    movement.processInput(quietWalk, 0.1f);
+    const auto quietDistance = glm::length(glm::vec2(camera.getPosition().x - beforeQuietWalk.x,
+                                                     camera.getPosition().z - beforeQuietWalk.z));
+    if (std::abs(quietDistance - camera.getSpeed() * 0.05f) > 0.01f)
+    {
+        std::cerr << "Shift did not slow local movement\n";
+        return 1;
+    }
+
+    auto crouch = keys;
+    crouch[SDLK_LCTRL] = true;
+    crouch[SDLK_W] = true;
+    const auto beforeCrouch = camera.getPosition();
+    movement.processInput(crouch, 0.1f);
+    const auto crouchDistance = glm::length(glm::vec2(camera.getPosition().x - beforeCrouch.x,
+                                                      camera.getPosition().z - beforeCrouch.z));
+    if (!movement.isCrouched() || std::abs(camera.getPosition().y - (-88.0f)) > 0.01f ||
+        std::abs(crouchDistance - camera.getSpeed() * 0.04f) > 0.01f)
+    {
+        std::cerr << "Ctrl did not lower the camera and slow local movement\n";
+        return 1;
+    }
+
+    btBoxShape ceilingShape(btVector3(30.0f, 7.0f, 30.0f));
+    btTransform ceilingTransform;
+    ceilingTransform.setIdentity();
+    ceilingTransform.setOrigin(btVector3(0.0f, -73.0f, 0.0f));
+    btDefaultMotionState ceilingMotion(ceilingTransform);
+    btRigidBody::btRigidBodyConstructionInfo ceilingInfo(0.0f, &ceilingMotion, &ceilingShape);
+    btRigidBody ceiling(ceilingInfo);
+    world.addRigidBody(&ceiling);
+    movement.processInput(keys, 0.016f);
+    if (!movement.isCrouched())
+    {
+        std::cerr << "Player stood up through a low ceiling\n";
+        return 1;
+    }
+    world.removeRigidBody(&ceiling);
+    movement.processInput(keys, 0.016f);
+    if (movement.isCrouched() || std::abs(camera.getPosition().y - (-64.0f)) > 0.01f)
+    {
+        std::cerr << "Player could not stand after leaving a low ceiling\n";
+        return 1;
+    }
+
     btBoxShape stairShape(btVector3(12.0f, 8.0f, 40.0f));
     btTransform stairTransform;
     stairTransform.setIdentity();

@@ -51,6 +51,7 @@ void DeathmatchMode::onEnter(ClientApp& app, const std::string& team)
     if (!spawns.empty())
     {
         app.camera.setPosition(pickSpawnPoint());
+        app.movement_controller.resetStance();
         app.movement_controller.resetVerticalMotion();
     }
 
@@ -226,6 +227,7 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
             if (!spawns.empty())
             {
                 app.camera.setPosition(pickSpawnPoint());
+                app.movement_controller.resetStance();
                 app.movement_controller.resetVerticalMotion();
             }
             m_prevCamPos = app.camera.getPosition();

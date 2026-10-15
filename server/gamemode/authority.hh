@@ -54,6 +54,7 @@ private:
         float verticalVelocity = 0.0f;
         bool grounded = false;
         bool jumpHeld = false;
+        bool crouched = false;
         WeaponState primary;
         WeaponState secondary;
         WeaponState knife;

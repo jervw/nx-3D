@@ -3,6 +3,7 @@
 #include <client/app/client_app.hh>
 #include <client/gamemode/bomb_player_state.hh>
 #include <shared/bomb_sites.hh>
+#include <shared/player_rules.hh>
 #include <client/project_root.hh>
 
 #include <nexilis/client/packet.hh>
@@ -13,6 +14,16 @@
 namespace nx3d::client::gamemode
 {
 namespace blt = spear::physics::bullet;
+namespace
+{
+float standingEyeY(const ClientApp& app)
+{
+    return app.camera.getPosition().y +
+           (app.movement_controller.isCrouched()
+                    ? nx3d::kStandingEyeHeight - nx3d::kCrouchingEyeHeight
+                    : 0.0f);
+}
+} // namespace
 
 bool BombMode::canMove() const
 {
@@ -108,6 +119,11 @@ void BombMode::update(ClientApp& app, float dt)
         }
         if (newRound && event.active && event.phase == "live")
         {
+            if (app.movement_controller.isCrouched() && !teamChanged)
+                app.camera.setPosition(app.camera.getPosition() +
+                                       glm::vec3(0.0f, nx3d::kStandingEyeHeight -
+                                                               nx3d::kCrouchingEyeHeight, 0.0f));
+            app.movement_controller.resetStance();
             if (teamChanged)
             {
                 m_lastSpawnIndex = SIZE_MAX;
@@ -179,7 +195,7 @@ void BombMode::update(ClientApp& app, float dt)
                                       : "Defend the bomb")
                            : (m_team == "Terrorist" ?
                                       (nx3d::bomb_sites::at(app.camera.getPosition().x,
-                                                           app.camera.getPosition().y,
+                                                           standingEyeY(app),
                                                            app.camera.getPosition().z)
                                                ? "Hold E to plant bomb"
                                                : "Plant at bombsite A or B")
@@ -204,7 +220,7 @@ void BombMode::handleKeyDown(ClientApp& app, const SDL_Event& event)
         const uint8_t action = m_planted ? 2 : 1;
         const auto pos = app.camera.getPosition();
         if ((action == 1 && m_team == "Terrorist" &&
-             nx3d::bomb_sites::at(pos.x, pos.y, pos.z)) ||
+             nx3d::bomb_sites::at(pos.x, standingEyeY(app), pos.z)) ||
             (action == 2 && m_team == "Counter Terrorist"))
         {
             app.tcp_client.sendMessage(nexilis::client::Packet::Room::Player3D::matchAction(app.client_api, action));

@@ -9,6 +9,7 @@
 #include <nexilis/server/command/command.hh>
 #include <nexilis/server/room_storage.hh>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -186,6 +187,39 @@ int main()
         Registry::update(0.05f);
         require(shopper->getObject3D().getPosition().y < airborneY,
                 "Server stopped gravity when movement packets stopped");
+
+        room->spawnPlayer(10);
+        const auto standingPosition = shopper->getObject3D().getPosition();
+        require(sendAsShooter(client::Packet::Room::Player3D::movement(
+                        shooter, Vector3f{1.0f, static_cast<float>(nx3d::kMoveSilentWalk), 0.0f},
+                        0.0f, 0.0f)) == server::CommandResult::success,
+                "Silent walk input was rejected");
+        Registry::update(0.05f);
+        require(shopper->getObject3D().getPosition().x - standingPosition.x <=
+                        nx3d::kSilentWalkSpeed * 0.05f + 0.1f,
+                "Silent walk exceeded its server speed limit");
+        const auto beforeCrouch = shopper->getObject3D().getPosition();
+        require(sendAsShooter(client::Packet::Room::Player3D::movement(
+                        shooter, Vector3f{0.0f, static_cast<float>(nx3d::kMoveCrouch), 0.0f},
+                        0.0f, 0.0f)) == server::CommandResult::success,
+                "Crouch input was rejected");
+        Registry::update(0.05f);
+        require(shopper->getObject3D().getDimensions().y == nx3d::kCrouchingEyeHeight &&
+                        shopper->getObject3D().getPosition().y < beforeCrouch.y - 20.0f,
+                "Server did not lower the crouched player");
+        const auto crouchedSnapshots = victim.getRemotePlayersSnapshot(777, 20);
+        const auto crouchedRemote = std::find_if(crouchedSnapshots.begin(), crouchedSnapshots.end(),
+                                               [](const auto& player) { return player.id == 10; });
+        require(crouchedRemote != crouchedSnapshots.end() &&
+                        crouchedRemote->h == nx3d::kCrouchingEyeHeight,
+                "Crouch stance was not replicated to other clients");
+        require(sendAsShooter(client::Packet::Room::Player3D::movement(
+                        shooter, Vector3f{0.0f, 0.0f, 0.0f}, 0.0f, 0.0f)) ==
+                        server::CommandResult::success,
+                "Stand input was rejected");
+        Registry::update(0.05f);
+        require(shopper->getObject3D().getDimensions().y == nx3d::kStandingEyeHeight,
+                "Server did not restore standing height");
 
         for (uint64_t kill = 1; kill <= 100; ++kill)
         {

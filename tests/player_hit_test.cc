@@ -19,4 +19,9 @@ int main()
         throw std::runtime_error("Rotated wide side missed");
     if (std::isfinite(playerHitDistance({0.0f, 0.0f, 30.0f}, -forward, player, 0.0f)))
         throw std::runtime_error("Shot behind the shooter hit");
+    if (!std::isfinite(playerHitDistance({0.0f, 70.0f, 30.0f}, forward,
+                                         {0.0f, 64.0f, 0.0f}, 0.0f)) ||
+        std::isfinite(playerHitDistance({0.0f, 70.0f, 30.0f}, forward,
+                                        {0.0f, 40.0f, 0.0f}, 0.0f, 40.0f)))
+        throw std::runtime_error("Crouched player kept a standing hitbox");
 }
