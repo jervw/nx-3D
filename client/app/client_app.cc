@@ -132,12 +132,12 @@ ClientApp::ClientApp(const std::string& initialServerAddress, const std::string&
     bomb_beep_audio->setSpatialRange(900.0f, 2500.0f);
     explosion_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/explosion.wav"));
-    terrorists_win_audio = std::make_unique<spear::audio::Sound>(
-            audio_system, nx3d::projectAssetPath("sounds/terrorists_win.wav"));
-    counter_terrorists_win_audio = std::make_unique<spear::audio::Sound>(
-            audio_system, nx3d::projectAssetPath("sounds/counter_terrorists_win.wav"));
-    hurt_audio = std::make_unique<spear::audio::Sound>(
-            audio_system, nx3d::projectAssetPath("sounds/hurt.wav"));
+    for (std::size_t pack = 0; pack < audio::kVoicePacks.size(); ++pack)
+        for (std::size_t cue = 0; cue < audio::kVoiceCueFiles.size(); ++cue)
+            voicePackSounds[pack][cue] = std::make_unique<spear::audio::Sound>(
+                    audio_system, nx3d::projectAssetPath(
+                            std::string("sounds/voicepacks/") + audio::kVoicePacks[pack].id +
+                            "/" + audio::kVoiceCueFiles[cue]));
     smoke_audio = std::make_unique<spear::audio::Sound>(
             audio_system, nx3d::projectAssetPath("sounds/smoke.wav"));
     walk_audio = std::make_unique<spear::audio::Sound>(
@@ -386,18 +386,23 @@ void ClientApp::applyAudioVolume()
         bomb_beep_audio->setVolume(0.6f * std::sqrt(audioVolume));
     if (explosion_audio)
         explosion_audio->setVolume(std::min(1.0f, 2.5f * std::sqrt(audioVolume)));
-    if (terrorists_win_audio)
-        terrorists_win_audio->setVolume(0.8f * std::sqrt(audioVolume));
-    if (counter_terrorists_win_audio)
-        counter_terrorists_win_audio->setVolume(0.8f * std::sqrt(audioVolume));
-    if (hurt_audio)
-        hurt_audio->setVolume(0.8f * std::sqrt(audioVolume));
+    for (auto& pack : voicePackSounds)
+        for (auto& sound : pack)
+            if (sound) sound->setVolume(0.8f * std::sqrt(audioVolume));
     if (smoke_audio)
         smoke_audio->setVolume(0.65f * audioVolume);
     if (walk_audio)
         walk_audio->setVolume(audioVolume);
     if (step_audio)
         step_audio->setVolume(audioVolume);
+}
+
+void ClientApp::playVoiceCue(audio::VoiceCue cue)
+{
+    const auto index = static_cast<std::size_t>(cue);
+    if (index < voicePackSounds[voicePackIndex].size())
+        if (auto& sound = voicePackSounds[voicePackIndex][index])
+            sound->play();
 }
 
 spear::audio::Sound* ClientApp::gunshotSound(uint8_t sound)
@@ -488,7 +493,8 @@ void ClientApp::refreshSettings()
             cap ? std::to_string(cap) : "Unlimited",
             graphicsDetail == 0 ? "Low" : graphicsDetail == 1 ? "Medium" : "High",
             std::to_string(static_cast<int>(std::lround(camera.getMouseSensitivity() * 100.0f))) + "%",
-            showFps ? "On" : "Off"
+            showFps ? "On" : "Off",
+            audio::kVoicePacks[voicePackIndex].name
     }}, settingsRow);
 }
 
@@ -528,6 +534,19 @@ void ClientApp::changeSetting(int row, int direction)
         showFps = !showFps;
         if (!showFps) ui->fpsText.setString("");
         break;
+    case 8:
+    {
+        const auto next = std::clamp(static_cast<int>(voicePackIndex) + direction,
+                                     0, static_cast<int>(audio::kVoicePacks.size()) - 1);
+        if (static_cast<std::size_t>(next) != voicePackIndex)
+        {
+            for (auto& sound : voicePackSounds[voicePackIndex])
+                if (sound) sound->stop();
+            voicePackIndex = static_cast<std::size_t>(next);
+            playVoiceCue(audio::VoiceCue::terroristsWin);
+        }
+        break;
+    }
     default: break;
     }
     refreshSettings();
@@ -551,6 +570,11 @@ void ClientApp::loadSettings()
     camera.setMouseSensitivity(sensitivity);
     audioVolume = std::clamp(volume, 0.0f, 1.0f);
     applyAudioVolume();
+    std::string voicePackId;
+    if (file >> voicePackId)
+        for (std::size_t i = 0; i < audio::kVoicePacks.size(); ++i)
+            if (voicePackId == audio::kVoicePacks[i].id)
+                voicePackIndex = i;
     const auto& size = kResolutions[resolutionIndex];
     SDL_SetWindowSize(window.getSDLWindow(), size.x, size.y);
     fullscreen = full != 0 && SDL_SetWindowFullscreen(window.getSDLWindow(), true);
@@ -566,7 +590,7 @@ void ClientApp::saveSettings() const
     file << resolutionIndex << ' ' << (fullscreen ? 1 : 0) << ' '
          << camera.getFov() << ' ' << audioVolume << ' ' << fpsCapIndex << ' '
          << graphicsDetail << ' ' << camera.getMouseSensitivity() << ' '
-         << (showFps ? 1 : 0) << '\n';
+         << (showFps ? 1 : 0) << ' ' << audio::kVoicePacks[voicePackIndex].id << '\n';
 }
 
 void ClientApp::openBuyMenu()
@@ -1109,9 +1133,9 @@ void ClientApp::run()
                         break;
                     }
                     if (event.key.key == SDLK_UP)
-                        settingsRow = (settingsRow + 7) % 8;
+                        settingsRow = (settingsRow + ui::Ui::kSettingsRowCount - 1) % ui::Ui::kSettingsRowCount;
                     else if (event.key.key == SDLK_DOWN)
-                        settingsRow = (settingsRow + 1) % 8;
+                        settingsRow = (settingsRow + 1) % ui::Ui::kSettingsRowCount;
                     else if (event.key.key == SDLK_LEFT)
                         changeSetting(settingsRow, -1);
                     else if (event.key.key == SDLK_RIGHT || event.key.key == SDLK_RETURN)

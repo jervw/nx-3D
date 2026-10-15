@@ -41,6 +41,7 @@ struct PlayerNameplate
 class Ui
 {
 public:
+    static constexpr int kSettingsRowCount = 9;
     enum class BuyStyle { List, Radial, Cs2 };
     explicit Ui(VkDevice device,
                 VkPhysicalDevice physDevice,
@@ -92,7 +93,7 @@ public:
     void renderPauseOverlay(spear::ui::RenderContext ctx, bool quitHovered,
                             bool ctHovered, bool tHovered, bool settingsHovered);
     void renderSettingsOverlay(spear::ui::RenderContext ctx, int selectedRow);
-    void showSettings(const std::array<std::string, 8>& values, int selectedRow);
+    void showSettings(const std::array<std::string, kSettingsRowCount>& values, int selectedRow);
     void hideSettings();
     int settingsRowAt(float x, float y) const;
     int settingsDirectionAt(float x) const;

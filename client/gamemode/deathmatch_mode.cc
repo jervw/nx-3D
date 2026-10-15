@@ -194,9 +194,9 @@ void DeathmatchMode::update(ClientApp& app, float delta_time)
     {
         if (evt.target_id == app.client_api.getClientId())
         {
-            if (evt.damage > 0.0f && m_hurtSoundCooldown <= 0.0f && app.hurt_audio)
+            if (evt.damage > 0.0f && m_hurtSoundCooldown <= 0.0f)
             {
-                app.hurt_audio->play();
+                app.playVoiceCue(audio::VoiceCue::hurt);
                 m_hurtSoundCooldown = 0.35f;
             }
             m_health = static_cast<int>(evt.new_health);

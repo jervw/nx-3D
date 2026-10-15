@@ -73,10 +73,10 @@ void BombMode::update(ClientApp& app, float dt)
             app.explosion_audio->play();
         if (m_phase == "live" && event.phase == "post")
         {
-            if (event.notice.starts_with("T win: ") && app.terrorists_win_audio)
-                app.terrorists_win_audio->play();
-            else if (event.notice.starts_with("CT win: ") && app.counter_terrorists_win_audio)
-                app.counter_terrorists_win_audio->play();
+            if (event.notice.starts_with("T win: "))
+                app.playVoiceCue(audio::VoiceCue::terroristsWin);
+            else if (event.notice.starts_with("CT win: "))
+                app.playVoiceCue(audio::VoiceCue::counterTerroristsWin);
         }
         m_round = event.round;
         m_tScore = event.terrorist_score;

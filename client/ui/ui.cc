@@ -278,7 +278,7 @@ Ui::Ui(VkDevice device,
     settingsBack.setString("");
     settingsBack.setColor(SDL_Color{255, 210, 130, 255});
     settingsBack.setPosition(glm::vec2(-0.17f, -0.59f));
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < kSettingsRowCount; ++i)
     {
         auto makeText = [&]
         {
@@ -286,7 +286,7 @@ Ui::Ui(VkDevice device,
                 device, physDevice, commandPool, graphicsQueue,
                 descriptorPool, descriptorSetLayout, fontPath, 19);
         };
-        const float y = 0.46f - i * 0.125f;
+        const float y = 0.48f - i * 0.115f;
         auto addText = [&](auto& texts, float x, SDL_Color color)
         {
             auto text = makeText();
@@ -923,25 +923,25 @@ void Ui::renderSettingsOverlay(spear::ui::RenderContext ctx, int selectedRow)
 {
     m_pauseBackdropQuad->render(ctx);
     m_settingsPanel->render(ctx);
-    if (selectedRow >= 0 && selectedRow < 8)
+    if (selectedRow >= 0 && selectedRow < kSettingsRowCount)
     {
-        m_settingsSelection->setPosition(glm::vec2(-0.65f, 0.43f - selectedRow * 0.125f));
+        m_settingsSelection->setPosition(glm::vec2(-0.65f, 0.45f - selectedRow * 0.115f));
         m_settingsSelection->render(ctx);
     }
 }
 
-void Ui::showSettings(const std::array<std::string, 8>& values, int selectedRow)
+void Ui::showSettings(const std::array<std::string, kSettingsRowCount>& values, int selectedRow)
 {
-    static constexpr std::array<const char*, 8> labels{{
+    static constexpr std::array<const char*, kSettingsRowCount> labels{{
             "Resolution", "Display mode", "Field of view", "Sound volume",
-            "FPS limit", "Smoke detail", "Mouse sensitivity", "Show FPS"}};
+            "FPS limit", "Smoke detail", "Mouse sensitivity", "Show FPS", "Voicepack"}};
     if (settingsTitle.getString() != "SETTINGS")
         settingsTitle.setString("SETTINGS");
     if (settingsHint.getString() != "UP/DOWN: Select   LEFT/RIGHT: Change   ESC: Back")
         settingsHint.setString("UP/DOWN: Select   LEFT/RIGHT: Change   ESC: Back");
     if (settingsBack.getString() != "[ BACK ]")
         settingsBack.setString("[ BACK ]");
-    for (int i = 0; i < 8; ++i)
+    for (int i = 0; i < kSettingsRowCount; ++i)
     {
         if (settingsRows[i]->getString() != labels[i])
             settingsRows[i]->setString(labels[i]);
@@ -981,9 +981,9 @@ int Ui::settingsRowAt(float x, float y) const
 {
     if (x < -0.65f || x > 0.65f)
         return -1;
-    for (int row = 0; row < 8; ++row)
+    for (int row = 0; row < kSettingsRowCount; ++row)
     {
-        const float center = 0.46f - row * 0.125f;
+        const float center = 0.48f - row * 0.115f;
         if (y >= center - 0.06f && y <= center + 0.055f)
             return row;
     }

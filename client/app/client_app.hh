@@ -2,6 +2,7 @@
 #define NX3D_CLIENT_APP_CLIENT_APP_HH
 
 #include <client/gamemode/game_mode.hh>
+#include <client/audio/voice_pack.hh>
 #include <client/ui/ui.hh>
 
 #include <nexilis/client/client_api.hh>
@@ -105,9 +106,10 @@ public:
     std::unique_ptr<spear::audio::Sound> defusing_audio;
     std::unique_ptr<spear::audio::Sound> bomb_beep_audio;
     std::unique_ptr<spear::audio::Sound> explosion_audio;
-    std::unique_ptr<spear::audio::Sound> terrorists_win_audio;
-    std::unique_ptr<spear::audio::Sound> counter_terrorists_win_audio;
-    std::unique_ptr<spear::audio::Sound> hurt_audio;
+    std::array<std::array<std::unique_ptr<spear::audio::Sound>,
+                          static_cast<std::size_t>(audio::VoiceCue::count)>,
+               audio::kVoicePacks.size()> voicePackSounds;
+    void playVoiceCue(audio::VoiceCue cue);
     std::unique_ptr<spear::audio::Sound> smoke_audio;
     std::unique_ptr<spear::audio::Sound> walk_audio;
     /// Short positional "step" clip for sounds other players make when
@@ -158,6 +160,7 @@ public:
 
     // --- Pause / audio -------------------------------------------------------
     float audioVolume = 0.1f;
+    std::size_t voicePackIndex = 0;
     bool quitHovered = false;
     bool ctTeamHovered = false;
     bool tTeamHovered = false;
